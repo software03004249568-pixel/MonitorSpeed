@@ -1,5 +1,6 @@
 package com.lesco.speedmonitor
 
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -18,11 +19,11 @@ import java.net.Socket
 import java.net.URL
 import kotlin.math.max
 
-class MainActivity : android.app.Activity() {
+class MainActivity : Activity() {
 
     private val bg = Color.rgb(7, 17, 31)
     private val card = Color.rgb(20, 34, 56)
-    private val text = Color.WHITE
+    private val white = Color.WHITE
     private val muted = Color.rgb(158, 175, 197)
     private val blue = Color.rgb(36, 123, 255)
     private val green = Color.rgb(55, 214, 160)
@@ -32,7 +33,7 @@ class MainActivity : android.app.Activity() {
     private lateinit var download: TextView
     private lateinit var upload: TextView
     private lateinit var ping: TextView
-    private lateinit var internetStatus: TextView
+    private lateinit var internetState: TextView
     private lateinit var level1Result: TextView
     private lateinit var sftpResult: TextView
     private lateinit var emailInput: EditText
@@ -73,7 +74,7 @@ class MainActivity : android.app.Activity() {
         }
 
         val icon = ImageView(this).apply {
-            setImageResource(com.lesco.speedmonitor.R.drawable.ic_speed)
+            setImageResource(R.drawable.ic_speed)
         }
         header.addView(icon, LinearLayout.LayoutParams(dp(58), dp(58)))
 
@@ -81,8 +82,8 @@ class MainActivity : android.app.Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), 0, 0, 0)
         }
-        titleBox.addView(tv("Speed Monitor", 26f, text, true))
-        titleBox.addView(tv("Live network performance dashboard", 13f, muted, false))
+        titleBox.addView(tv("Speed Monitor", 26f, white, true))
+        titleBox.addView(tv("Live Network Performance", 13f, muted, false))
         header.addView(titleBox, LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(header)
 
@@ -91,21 +92,19 @@ class MainActivity : android.app.Activity() {
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(18), dp(18), dp(18), dp(18))
-            background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_card)
+            setPadding(dp(18), dp(16), dp(18), dp(16))
+            background = getDrawable(R.drawable.card)
         }
-
         hero.addView(tv("INTERNET SPEED", 12f, blue, true))
-        download = tv("-- Mbps", 38f, text, true)
+        download = tv("-- Mbps", 38f, white, true)
         hero.addView(download)
         upload = tv("↑ -- Mbps", 15f, muted, false)
         hero.addView(upload)
         ping = tv("Ping -- ms", 14f, muted, false)
         hero.addView(ping)
-        internetStatus = tv("READY", 13f, green, true)
-        internetStatus.setPadding(0, dp(7), 0, 0)
-        hero.addView(internetStatus)
-        root.addView(hero, LinearLayout.LayoutParams(-1, dp(190)))
+        internetState = tv("READY", 13f, green, true)
+        hero.addView(internetState)
+        root.addView(hero, LinearLayout.LayoutParams(-1, dp(185)))
 
         root.addView(space(12))
 
@@ -117,12 +116,8 @@ class MainActivity : android.app.Activity() {
 
         root.addView(section("SERVER MONITORING"))
 
-        root.addView(serverCard(
-            "LEVEL 1",
-            "usersnap.pitc.com.pk",
-            { level1Result = it },
-            green
-        ))
+        val levelCard = serverCard("LEVEL 1", "usersnap.pitc.com.pk", green) { level1Result = it }
+        root.addView(levelCard, lp(-1, 92, 0, 0, 0, 8))
 
         level1Button = makeButton("START LEVEL 1 MONITOR", green)
         level1Button.setOnClickListener {
@@ -130,12 +125,8 @@ class MainActivity : android.app.Activity() {
         }
         root.addView(level1Button, lp(-1, 50, 0, 0, 0, 12))
 
-        root.addView(serverCard(
-            "SFTP / FTP",
-            "snaps.pitc.com.pk : 2232",
-            { sftpResult = it },
-            blue
-        ))
+        val sftpCard = serverCard("SFTP", "snaps.pitc.com.pk : 2232", blue) { sftpResult = it }
+        root.addView(sftpCard, lp(-1, 92, 0, 0, 0, 8))
 
         sftpButton = makeButton("START SFTP MONITOR", blue)
         sftpButton.setOnClickListener {
@@ -153,35 +144,37 @@ class MainActivity : android.app.Activity() {
         emailInput = EditText(this).apply {
             hint = "Alert email address"
             setHintTextColor(muted)
-            setTextColor(text)
+            setTextColor(white)
             textSize = 15f
             setSingleLine(true)
             setPadding(dp(14), 0, dp(14), 0)
-            background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_input)
+            background = getDrawable(R.drawable.input)
         }
-        emailRow.addView(emailInput, LinearLayout.LayoutParams(0, 52.dp(), 1f))
+        emailRow.addView(emailInput, LinearLayout.LayoutParams(0, dp(52), 1f))
 
-        val save = smallButton("SAVE")
-        save.setOnClickListener { saveEmail() }
-        emailRow.addView(save, LinearLayout.LayoutParams(dp(86), 52.dp()).apply {
+        val save = makeButton("SAVE", blue)
+        save.textSize = 12f
+        emailRow.addView(save, LinearLayout.LayoutParams(dp(88), dp(52)).apply {
             setMargins(dp(8), 0, 0, 0)
         })
+        save.setOnClickListener { saveEmail() }
+
         root.addView(emailRow)
 
-        val send = makeButton("✉  SEND TEST / SERVER ALERT MAIL", green)
-        send.setOnClickListener { sendAlertMail() }
+        val send = makeButton("✉  SEND ALERT EMAIL", green)
+        send.setOnClickListener { sendAlertMail("Manual server alert test") }
         root.addView(send, lp(-1, 50, 0, 10, 0, 16))
 
         val info = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(14), dp(16), dp(14))
-            background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_card)
+            background = getDrawable(R.drawable.card)
         }
-        info.addView(tv("MONITORING", 12f, blue, true))
-        info.addView(tv("• Internet: live download, upload & ping", 13f, muted, false))
-        info.addView(tv("• Level 1: live API response / availability", 13f, muted, false))
-        info.addView(tv("• SFTP: live port connectivity / response", 13f, muted, false))
-        info.addView(tv("• Tests run only while the monitor is ON", 13f, muted, false))
+        info.addView(tv("MONITORING MODE", 12f, blue, true))
+        info.addView(tv("• Internet: live Download / Upload / Ping", 13f, muted, false))
+        info.addView(tv("• Level 1: live API response time", 13f, muted, false))
+        info.addView(tv("• SFTP: live port response time", 13f, muted, false))
+        info.addView(tv("• Monitoring runs only after START", 13f, muted, false))
         root.addView(info)
 
         root.addView(space(16))
@@ -192,71 +185,67 @@ class MainActivity : android.app.Activity() {
         return scroll
     }
 
-    private fun serverCard(
-        title: String,
-        host: String,
-        resultSetter: (TextView) -> Unit,
-        accent: Int
-    ): View {
+    private fun serverCard(title: String, host: String, accent: Int, setter: (TextView) -> Unit): View {
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(14), dp(16), dp(14))
-            background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_card)
+            setPadding(dp(16), dp(12), dp(16), dp(10))
+            background = getDrawable(R.drawable.card)
         }
-        box.addView(tv(title, 13f, accent, true))
-        val result = tv("READY", 18f, muted, true)
-        resultSetter(result)
+        box.addView(tv(title, 12f, accent, true))
+        val result = tv("READY", 17f, muted, true)
+        setter(result)
         box.addView(result)
         box.addView(tv(host, 12f, muted, false))
         return box
     }
 
-    private fun section(s: String): TextView =
-        tv(s, 13f, muted, true).apply { setPadding(dp(2), dp(4), 0, dp(8)) }
+    private fun section(s: String) = tv(s, 13f, muted, true).apply {
+        setPadding(dp(2), dp(4), 0, dp(8))
+    }
 
     private fun startInternet() {
         internetRunning = true
         internetButton.text = "■  STOP LIVE SPEED TEST"
-        internetButton.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_red)
-        internetStatus.text = "LIVE"
-        internetStatus.setTextColor(green)
+        internetButton.background = getDrawable(R.drawable.red)
+        internetState.text = "LIVE"
+        internetState.setTextColor(green)
         runInternetCycle()
     }
 
     private fun stopInternet() {
         internetRunning = false
         internetButton.text = "▶  START LIVE SPEED TEST"
-        internetButton.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_button)
-        internetStatus.text = "STOPPED"
-        internetStatus.setTextColor(muted)
+        internetButton.background = getDrawable(R.drawable.blue)
+        internetState.text = "STOPPED"
+        internetState.setTextColor(muted)
     }
 
     private fun runInternetCycle() {
         if (!internetRunning) return
         Thread {
-            var p = -1L
+            var pingMs = -1L
             try {
-                val ps = System.currentTimeMillis()
+                val start = System.currentTimeMillis()
                 val process = Runtime.getRuntime().exec(arrayOf("ping", "-c", "1", "-W", "1", "8.8.8.8"))
                 process.waitFor()
-                if (process.exitValue() == 0) p = System.currentTimeMillis() - ps
+                if (process.exitValue() == 0) pingMs = System.currentTimeMillis() - start
 
                 val down = downloadSpeed()
                 val up = uploadSpeed()
 
                 runOnUiThread {
                     if (!internetRunning) return@runOnUiThread
-                    ping.text = if (p >= 0) "Ping $p ms" else "Ping -- ms"
+                    ping.text = if (pingMs >= 0) "Ping $pingMs ms" else "Ping -- ms"
                     download.text = if (down >= 0) String.format("%.2f Mbps", down) else "-- Mbps"
                     upload.text = if (up >= 0) "↑ " + String.format("%.2f Mbps", up) else "↑ -- Mbps"
-                    internetStatus.text = if (p >= 0) "LIVE • ONLINE" else "OFFLINE"
-                    internetStatus.setTextColor(if (p >= 0) green else red)
+                    internetState.text = if (pingMs >= 0) "LIVE • ONLINE" else "OFFLINE"
+                    internetState.setTextColor(if (pingMs >= 0) green else red)
                 }
             } catch (_: Exception) {
                 runOnUiThread {
                     if (!internetRunning) return@runOnUiThread
-                    internetStatus.text = "OFFLINE"
-                    internetStatus.setTextColor(red)
+                    internetState.text = "OFFLINE"
+                    internetState.setTextColor(red)
                     download.text = "-- Mbps"
                     upload.text = "↑ -- Mbps"
                     ping.text = "Ping -- ms"
@@ -269,8 +258,7 @@ class MainActivity : android.app.Activity() {
     private fun downloadSpeed(): Double {
         var c: HttpURLConnection? = null
         return try {
-            val u = URL("https://speed.cloudflare.com/__down?bytes=262144")
-            c = u.openConnection() as HttpURLConnection
+            c = URL("https://speed.cloudflare.com/__down?bytes=262144").openConnection() as HttpURLConnection
             c.connectTimeout = 5000
             c.readTimeout = 5000
             c.requestMethod = "GET"
@@ -295,8 +283,7 @@ class MainActivity : android.app.Activity() {
         var c: HttpURLConnection? = null
         return try {
             val data = ByteArray(131072)
-            val u = URL("https://speed.cloudflare.com/__up")
-            c = u.openConnection() as HttpURLConnection
+            c = URL("https://speed.cloudflare.com/__up").openConnection() as HttpURLConnection
             c.connectTimeout = 5000
             c.readTimeout = 5000
             c.requestMethod = "POST"
@@ -316,7 +303,7 @@ class MainActivity : android.app.Activity() {
     private fun startLevel1() {
         level1Running = true
         level1Button.text = "■  STOP LEVEL 1 MONITOR"
-        level1Button.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_red)
+        level1Button.background = getDrawable(R.drawable.red)
         level1Result.text = "TESTING..."
         level1Result.setTextColor(yellow)
         runLevel1Cycle()
@@ -325,7 +312,7 @@ class MainActivity : android.app.Activity() {
     private fun stopLevel1() {
         level1Running = false
         level1Button.text = "START LEVEL 1 MONITOR"
-        level1Button.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_green)
+        level1Button.background = getDrawable(R.drawable.green)
         level1Result.text = "STOPPED"
         level1Result.setTextColor(muted)
     }
@@ -336,8 +323,7 @@ class MainActivity : android.app.Activity() {
             var c: HttpURLConnection? = null
             try {
                 val start = System.currentTimeMillis()
-                c = URL("https://usersnap.pitc.com.pk/api/SnapsForPrinting/ToPrinting")
-                    .openConnection() as HttpURLConnection
+                c = URL("https://usersnap.pitc.com.pk/api/SnapsForPrinting/ToPrinting").openConnection() as HttpURLConnection
                 c.requestMethod = "POST"
                 c.connectTimeout = 8000
                 c.readTimeout = 8000
@@ -347,6 +333,7 @@ class MainActivity : android.app.Activity() {
                 c.outputStream.use { it.write(json.toByteArray(Charsets.UTF_8)) }
                 val code = c.responseCode
                 val ms = System.currentTimeMillis() - start
+
                 runOnUiThread {
                     if (!level1Running) return@runOnUiThread
                     if (code in 200..299) {
@@ -363,7 +350,9 @@ class MainActivity : android.app.Activity() {
                     level1Result.text = "OFFLINE / SERVER ERROR"
                     level1Result.setTextColor(red)
                 }
-            } finally { c?.disconnect() }
+            } finally {
+                c?.disconnect()
+            }
             handler.postDelayed({ runLevel1Cycle() }, interval)
         }.start()
     }
@@ -371,7 +360,7 @@ class MainActivity : android.app.Activity() {
     private fun startSftp() {
         sftpRunning = true
         sftpButton.text = "■  STOP SFTP MONITOR"
-        sftpButton.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_red)
+        sftpButton.background = getDrawable(R.drawable.red)
         sftpResult.text = "TESTING..."
         sftpResult.setTextColor(yellow)
         runSftpCycle()
@@ -380,7 +369,7 @@ class MainActivity : android.app.Activity() {
     private fun stopSftp() {
         sftpRunning = false
         sftpButton.text = "START SFTP MONITOR"
-        sftpButton.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_button)
+        sftpButton.background = getDrawable(R.drawable.blue)
         sftpResult.text = "STOPPED"
         sftpResult.setTextColor(muted)
     }
@@ -424,24 +413,31 @@ class MainActivity : android.app.Activity() {
     }
 
     private fun loadEmail() {
-        val email = getSharedPreferences("SpeedMonitor", MODE_PRIVATE)
-            .getString("alert_email", "") ?: ""
-        emailInput.setText(email)
+        emailInput.setText(
+            getSharedPreferences("SpeedMonitor", MODE_PRIVATE)
+                .getString("alert_email", "") ?: ""
+        )
     }
 
-    private fun sendAlertMail() {
+    private fun sendAlertMail(reason: String) {
         val email = emailInput.text.toString().trim()
         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             Toast.makeText(this, "Enter and save a valid email first", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val subject = "Speed Monitor - Server Alert"
-        val body = buildString {
-            append("Speed Monitor Server Alert\n\n")
-            append("Please check the network/server status.\n\n")
-            append("This message was generated from LESCO Speed Monitor.\n")
-        }
+        val subject = "Speed Monitor Alert"
+        val body = """
+            Speed Monitor Alert
+
+            Status: $reason
+
+            Internet: ${internetState.text}
+            Level 1: ${level1Result.text}
+            SFTP: ${sftpResult.text}
+
+            Speed Monitor - LESCO IT Directorate
+        """.trimIndent()
 
         val intent = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("mailto:$email")
@@ -456,27 +452,24 @@ class MainActivity : android.app.Activity() {
         }
     }
 
-    private fun makeButton(label: String, color: Int): Button =
+    private fun makeButton(label: String, color: Int) =
         Button(this).apply {
             text = label
             textSize = 13f
-            setTextColor(text)
+            setTextColor(white)
             typeface = Typeface.DEFAULT_BOLD
             isAllCaps = false
             background = getDrawable(
                 when (color) {
-                    green -> com.lesco.speedmonitor.R.drawable.rounded_green
-                    red -> com.lesco.speedmonitor.R.drawable.rounded_red
-                    else -> com.lesco.speedmonitor.R.drawable.rounded_button
+                    green -> R.drawable.green
+                    red -> R.drawable.red
+                    else -> R.drawable.blue
                 }
             )
             elevation = dp(3).toFloat()
         }
 
-    private fun smallButton(label: String): Button =
-        makeButton(label, blue).apply { textSize = 12f }
-
-    private fun tv(s: String, size: Float, color: Int, bold: Boolean): TextView =
+    private fun tv(s: String, size: Float, color: Int, bold: Boolean) =
         TextView(this).apply {
             text = s
             textSize = size
@@ -484,19 +477,17 @@ class MainActivity : android.app.Activity() {
             typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         }
 
-    private fun space(h: Int): View = Space(this).apply {
+    private fun space(h: Int) = Space(this).apply {
         layoutParams = LinearLayout.LayoutParams(1, dp(h))
     }
 
-    private fun lp(w: Int, h: Int, l: Int, t: Int, r: Int, b: Int): LinearLayout.LayoutParams =
+    private fun lp(w: Int, h: Int, l: Int, t: Int, r: Int, b: Int) =
         LinearLayout.LayoutParams(w, dp(h)).apply {
             setMargins(dp(l), dp(t), dp(r), dp(b))
         }
 
     private fun dp(v: Int): Int =
         (v * resources.displayMetrics.density).toInt()
-
-    private fun Int.dp(): Int = dp(this)
 
     override fun onDestroy() {
         internetRunning = false
