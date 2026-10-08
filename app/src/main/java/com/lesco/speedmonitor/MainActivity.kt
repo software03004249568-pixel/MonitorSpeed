@@ -3,8 +3,9 @@ package com.lesco.speedmonitor
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
-import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
@@ -13,10 +14,13 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import java.io.BufferedInputStream
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.URL
+import kotlin.math.max
 
 class MainActivity : AppCompatActivity() {
 
@@ -31,9 +35,10 @@ class MainActivity : AppCompatActivity() {
     private val primary = Color.rgb(60, 150, 255)
     private val accent = Color.rgb(45, 210, 140)
     private val danger = Color.rgb(240, 80, 90)
+    private val yellow = Color.rgb(245, 190, 60)
 
     // =========================================================
-    // UI VARIABLES
+    // UI
     // =========================================================
 
     private lateinit var d: TextView
@@ -45,7 +50,37 @@ class MainActivity : AppCompatActivity() {
     private lateinit var level1Result: TextView
     private lateinit var sftpResult: TextView
 
+    private lateinit var internetButton: Button
+    private lateinit var level1Button: Button
+    private lateinit var sftpButton: Button
+
     private lateinit var emailInput: EditText
+
+    // =========================================================
+    // LIVE TEST FLAGS
+    // =========================================================
+
+    @Volatile
+    private var internetRunning = false
+
+    @Volatile
+    private var level1Running = false
+
+    @Volatile
+    private var sftpRunning = false
+
+    // =========================================================
+    // HANDLER
+    // =========================================================
+
+    private val handler =
+        Handler(Looper.getMainLooper())
+
+    // =========================================================
+    // INTERVAL
+    // =========================================================
+
+    private val testInterval = 1000L
 
     // =========================================================
     // ON CREATE
@@ -63,7 +98,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // BUILD UI
+    // UI
     // =========================================================
 
     private fun buildUi(): ScrollView {
@@ -129,12 +164,11 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
         }
 
-        // INTERNET CARD
-
-        val internetCard = statCard(
-            "INTERNET",
-            primary
-        )
+        val internetCard =
+            statCard(
+                "INTERNET",
+                primary
+            )
 
         d = internetCard.second[0]
         u = internetCard.second[1]
@@ -145,12 +179,11 @@ class MainActivity : AppCompatActivity() {
             weightParams(1f, 6)
         )
 
-        // STATUS CARD
-
-        val statusCard = statCard(
-            "STATUS",
-            accent
-        )
+        val statusCard =
+            statCard(
+                "STATUS",
+                accent
+            )
 
         status = statusCard.second[0]
 
@@ -174,17 +207,23 @@ class MainActivity : AppCompatActivity() {
         // INTERNET BUTTON
         // =====================================================
 
-        root.addView(
+        internetButton =
             button(
                 "TEST INTERNET SPEED",
                 primary
-            ).apply {
+            )
 
-                setOnClickListener {
-                    testInternet()
-                }
+        internetButton.setOnClickListener {
 
-            },
+            if (internetRunning) {
+                stopInternetTest()
+            } else {
+                startInternetTest()
+            }
+        }
+
+        root.addView(
+            internetButton,
             marginParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(52),
@@ -200,32 +239,38 @@ class MainActivity : AppCompatActivity() {
         // =====================================================
 
         root.addView(
-            sectionTitle("LEVEL 1 SERVER")
+            sectionTitle(
+                "LEVEL 1 SERVER"
+            )
         )
 
-        val level1Card = LinearLayout(this).apply {
+        val level1Card =
+            LinearLayout(this).apply {
 
-            orientation = LinearLayout.VERTICAL
+                orientation =
+                    LinearLayout.VERTICAL
 
-            setPadding(
-                dp(16),
-                dp(14),
-                dp(16),
-                dp(14)
+                setPadding(
+                    dp(16),
+                    dp(14),
+                    dp(16),
+                    dp(14)
+                )
+
+                background =
+                    rounded(
+                        cardColor,
+                        14
+                    )
+            }
+
+        level1Result =
+            text(
+                "Not tested",
+                16f,
+                muted,
+                false
             )
-
-            background = rounded(
-                cardColor,
-                14
-            )
-        }
-
-        level1Result = text(
-            "Not tested",
-            16f,
-            muted,
-            false
-        )
 
         level1Card.addView(
             level1Result
@@ -233,7 +278,7 @@ class MainActivity : AppCompatActivity() {
 
         level1Card.addView(
             text(
-                "Server: usersnap.pitc.com.pk",
+                "usersnap.pitc.com.pk",
                 13f,
                 muted,
                 false
@@ -260,17 +305,23 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        root.addView(
+        level1Button =
             button(
-                "TEST LEVEL 1",
+                "START LEVEL 1 TEST",
                 accent
-            ).apply {
+            )
 
-                setOnClickListener {
-                    testLevel1()
-                }
+        level1Button.setOnClickListener {
 
-            },
+            if (level1Running) {
+                stopLevel1Test()
+            } else {
+                startLevel1Test()
+            }
+        }
+
+        root.addView(
+            level1Button,
             marginParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(50),
@@ -286,32 +337,38 @@ class MainActivity : AppCompatActivity() {
         // =====================================================
 
         root.addView(
-            sectionTitle("SFTP SERVER")
+            sectionTitle(
+                "SFTP SERVER"
+            )
         )
 
-        val sftpCard = LinearLayout(this).apply {
+        val sftpCard =
+            LinearLayout(this).apply {
 
-            orientation = LinearLayout.VERTICAL
+                orientation =
+                    LinearLayout.VERTICAL
 
-            setPadding(
-                dp(16),
-                dp(14),
-                dp(16),
-                dp(14)
+                setPadding(
+                    dp(16),
+                    dp(14),
+                    dp(16),
+                    dp(14)
+                )
+
+                background =
+                    rounded(
+                        cardColor,
+                        14
+                    )
+            }
+
+        sftpResult =
+            text(
+                "Not tested",
+                16f,
+                muted,
+                false
             )
-
-            background = rounded(
-                cardColor,
-                14
-            )
-        }
-
-        sftpResult = text(
-            "Not tested",
-            16f,
-            muted,
-            false
-        )
 
         sftpCard.addView(
             sftpResult
@@ -319,7 +376,7 @@ class MainActivity : AppCompatActivity() {
 
         sftpCard.addView(
             text(
-                "Server: snaps.pitc.com.pk : 2232",
+                "snaps.pitc.com.pk : 2232",
                 13f,
                 muted,
                 false
@@ -346,17 +403,23 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        root.addView(
+        sftpButton =
             button(
-                "TEST SFTP",
+                "START SFTP TEST",
                 primary
-            ).apply {
+            )
 
-                setOnClickListener {
-                    testSftp()
-                }
+        sftpButton.setOnClickListener {
 
-            },
+            if (sftpRunning) {
+                stopSftpTest()
+            } else {
+                startSftpTest()
+            }
+        }
+
+        root.addView(
+            sftpButton,
             marginParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(50),
@@ -368,37 +431,46 @@ class MainActivity : AppCompatActivity() {
         )
 
         // =====================================================
-        // EMAIL ALERT
+        // EMAIL
         // =====================================================
 
         root.addView(
-            sectionTitle("SERVER DOWN ALERT")
+            sectionTitle(
+                "SERVER DOWN ALERT"
+            )
         )
 
-        emailInput = EditText(this).apply {
+        emailInput =
+            EditText(this).apply {
 
-            hint = "Enter email address"
+                hint =
+                    "Enter email address"
 
-            setHintTextColor(muted)
+                setHintTextColor(
+                    muted
+                )
 
-            setTextColor(white)
+                setTextColor(
+                    white
+                )
 
-            textSize = 15f
+                textSize = 15f
 
-            setSingleLine(true)
+                setSingleLine(true)
 
-            setPadding(
-                dp(14),
-                0,
-                dp(14),
-                0
-            )
+                setPadding(
+                    dp(14),
+                    0,
+                    dp(14),
+                    0
+                )
 
-            background = rounded(
-                cardColor,
-                12
-            )
-        }
+                background =
+                    rounded(
+                        cardColor,
+                        12
+                    )
+            }
 
         root.addView(
             emailInput,
@@ -421,7 +493,6 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener {
                     saveEmail()
                 }
-
             },
             marginParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -445,7 +516,8 @@ class MainActivity : AppCompatActivity() {
                 false
             ).apply {
 
-                gravity = Gravity.CENTER
+                gravity =
+                    Gravity.CENTER
 
                 setPadding(
                     0,
@@ -460,68 +532,173 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // INTERNET TEST
+    // START INTERNET
     // =========================================================
 
-    private fun testInternet() {
+    private fun startInternetTest() {
 
-        status.text = "Testing..."
-        status.setTextColor(primary)
+        internetRunning = true
 
-        d.text = "-- Mbps"
-        u.text = "↑ -- Mbps"
-        ping.text = "Ping -- ms"
+        internetButton.text =
+            "STOP INTERNET TEST"
+
+        internetButton.setBackgroundColor(
+            danger
+        )
+
+        status.text =
+            "LIVE"
+
+        status.setTextColor(
+            accent
+        )
+
+        runInternetCycle()
+    }
+
+    // =========================================================
+    // STOP INTERNET
+    // =========================================================
+
+    private fun stopInternetTest() {
+
+        internetRunning = false
+
+        internetButton.text =
+            "TEST INTERNET SPEED"
+
+        internetButton.setBackgroundColor(
+            primary
+        )
+
+        status.text =
+            "Stopped"
+
+        status.setTextColor(
+            muted
+        )
+    }
+
+    // =========================================================
+    // INTERNET CYCLE
+    // =========================================================
+
+    private fun runInternetCycle() {
+
+        if (!internetRunning) {
+            return
+        }
 
         Thread {
 
+            var pingMs = -1L
+
             try {
 
-                val start =
+                // -------------------------------------------------
+                // PING
+                // -------------------------------------------------
+
+                val pingStart =
                     System.currentTimeMillis()
 
-                val process = Runtime.getRuntime().exec(
-                    arrayOf(
-                        "ping",
-                        "-c",
-                        "1",
-                        "-W",
-                        "2",
-                        "8.8.8.8"
+                val process =
+                    Runtime.getRuntime().exec(
+                        arrayOf(
+                            "ping",
+                            "-c",
+                            "1",
+                            "-W",
+                            "1",
+                            "8.8.8.8"
+                        )
                     )
-                )
 
                 process.waitFor()
 
-                val elapsed =
-                    System.currentTimeMillis() - start
+                if (process.exitValue() == 0) {
 
-                val reachable =
-                    process.exitValue() == 0
+                    pingMs =
+                        System.currentTimeMillis() -
+                                pingStart
+                }
+
+                // -------------------------------------------------
+                // DOWNLOAD TEST
+                // -------------------------------------------------
+
+                val downloadMbps =
+                    downloadSpeed()
+
+                // -------------------------------------------------
+                // UPLOAD TEST
+                // -------------------------------------------------
+
+                val uploadMbps =
+                    uploadSpeed()
+
+                // -------------------------------------------------
+                // UPDATE UI
+                // -------------------------------------------------
 
                 runOnUiThread {
 
-                    if (reachable) {
+                    if (!internetRunning) {
+                        return@runOnUiThread
+                    }
 
-                        status.text = "Online"
-                        status.setTextColor(accent)
+                    if (pingMs >= 0) {
 
                         ping.text =
-                            "Ping $elapsed ms"
+                            "Ping $pingMs ms"
 
-                        d.text =
-                            "Online"
+                        status.text =
+                            "LIVE"
 
-                        u.text =
-                            "↑ Connected"
+                        status.setTextColor(
+                            accent
+                        )
 
                     } else {
 
-                        status.text = "Offline"
-                        status.setTextColor(danger)
+                        ping.text =
+                            "Ping -- ms"
 
-                        d.text = "-- Mbps"
-                        u.text = "↑ -- Mbps"
-                        ping.text = "Ping -- ms"
+                        status.text =
+                            "OFFLINE"
+
+                        status.setTextColor(
+                            danger
+                        )
+                    }
+
+                    if (downloadMbps >= 0) {
+
+                        d.text =
+                            String.format(
+                                "%.2f Mbps",
+                                downloadMbps
+                            )
+
+                    } else {
+
+                        d.text =
+                            "-- Mbps"
+                    }
+
+                    if (uploadMbps >= 0) {
+
+                        u.text =
+                            "↑ " +
+                                    String.format(
+                                        "%.2f Mbps",
+                                        uploadMbps
+                                    )
+
+                    } else {
+
+                        u.text =
+                            "↑ -- Mbps"
                     }
                 }
 
@@ -529,50 +706,299 @@ class MainActivity : AppCompatActivity() {
 
                 runOnUiThread {
 
-                    status.text = "Error"
-                    status.setTextColor(danger)
+                    if (!internetRunning) {
+                        return@runOnUiThread
+                    }
 
-                    d.text = "-- Mbps"
-                    u.text = "↑ -- Mbps"
-                    ping.text = "Ping -- ms"
+                    status.text =
+                        "OFFLINE"
+
+                    status.setTextColor(
+                        danger
+                    )
+
+                    d.text =
+                        "-- Mbps"
+
+                    u.text =
+                        "↑ -- Mbps"
+
+                    ping.text =
+                        "Ping -- ms"
                 }
             }
+
+            handler.postDelayed(
+                {
+                    runInternetCycle()
+                },
+                testInterval
+            )
 
         }.start()
     }
 
     // =========================================================
-    // LEVEL 1 TEST
+    // DOWNLOAD SPEED
     // =========================================================
 
-    private fun testLevel1() {
+    private fun downloadSpeed(): Double {
+
+        var connection:
+                HttpURLConnection? = null
+
+        try {
+
+            val url =
+                URL(
+                    "https://speed.cloudflare.com/__down?bytes=262144"
+                )
+
+            connection =
+                url.openConnection()
+                        as HttpURLConnection
+
+            connection.connectTimeout =
+                5000
+
+            connection.readTimeout =
+                5000
+
+            connection.requestMethod =
+                "GET"
+
+            connection.connect()
+
+            val start =
+                System.nanoTime()
+
+            var totalBytes = 0L
+
+            val buffer =
+                ByteArray(16384)
+
+            val input =
+                BufferedInputStream(
+                    connection.inputStream
+                )
+
+            while (true) {
+
+                val count =
+                    input.read(buffer)
+
+                if (count == -1) {
+                    break
+                }
+
+                totalBytes += count
+
+                if (
+                    totalBytes >=
+                    262144L
+                ) {
+                    break
+                }
+            }
+
+            input.close()
+
+            val elapsed =
+                max(
+                    1L,
+                    System.nanoTime() - start
+                )
+
+            return (
+                totalBytes.toDouble() *
+                        8.0 /
+                        elapsed.toDouble()
+                ) * 1000000000.0 /
+                    1000000.0
+
+        } catch (ex: Exception) {
+
+            return -1.0
+
+        } finally {
+
+            connection?.disconnect()
+        }
+    }
+
+    // =========================================================
+    // UPLOAD SPEED
+    // =========================================================
+
+    private fun uploadSpeed(): Double {
+
+        var connection:
+                HttpURLConnection? = null
+
+        try {
+
+            val size =
+                131072
+
+            val data =
+                ByteArray(size)
+
+            val url =
+                URL(
+                    "https://speed.cloudflare.com/__up"
+                )
+
+            connection =
+                url.openConnection()
+                        as HttpURLConnection
+
+            connection.connectTimeout =
+                5000
+
+            connection.readTimeout =
+                5000
+
+            connection.requestMethod =
+                "POST"
+
+            connection.doOutput =
+                true
+
+            connection.setFixedLengthStreamingMode(
+                size
+            )
+
+            connection.setRequestProperty(
+                "Content-Type",
+                "application/octet-stream"
+            )
+
+            connection.connect()
+
+            val start =
+                System.nanoTime()
+
+            val output:
+                    OutputStream =
+                connection.outputStream
+
+            output.write(data)
+            output.flush()
+            output.close()
+
+            connection.responseCode
+
+            val elapsed =
+                max(
+                    1L,
+                    System.nanoTime() - start
+                )
+
+            return (
+                size.toDouble() *
+                        8.0 /
+                        elapsed.toDouble()
+                ) * 1000000000.0 /
+                    1000000.0
+
+        } catch (ex: Exception) {
+
+            return -1.0
+
+        } finally {
+
+            connection?.disconnect()
+        }
+    }
+
+    // =========================================================
+    // START LEVEL 1
+    // =========================================================
+
+    private fun startLevel1Test() {
+
+        level1Running = true
+
+        level1Button.text =
+            "STOP LEVEL 1 TEST"
+
+        level1Button.setBackgroundColor(
+            danger
+        )
 
         level1Result.text =
-            "Testing Level-1 server..."
+            "LIVE TEST STARTED..."
 
-        level1Result.setTextColor(primary)
+        level1Result.setTextColor(
+            primary
+        )
+
+        runLevel1Cycle()
+    }
+
+    // =========================================================
+    // STOP LEVEL 1
+    // =========================================================
+
+    private fun stopLevel1Test() {
+
+        level1Running = false
+
+        level1Button.text =
+            "START LEVEL 1 TEST"
+
+        level1Button.setBackgroundColor(
+            accent
+        )
+
+        level1Result.text =
+            "Test stopped"
+
+        level1Result.setTextColor(
+            muted
+        )
+    }
+
+    // =========================================================
+    // LEVEL 1 CYCLE
+    // =========================================================
+
+    private fun runLevel1Cycle() {
+
+        if (!level1Running) {
+            return
+        }
 
         Thread {
+
+            var connection:
+                    HttpURLConnection? = null
 
             try {
 
                 val start =
                     System.currentTimeMillis()
 
-                val url = URL(
-                    "https://usersnap.pitc.com.pk/api/SnapsForPrinting/ToPrinting"
-                )
+                val url =
+                    URL(
+                        "https://usersnap.pitc.com.pk/api/SnapsForPrinting/ToPrinting"
+                    )
 
-                val connection =
+                connection =
                     url.openConnection()
                             as HttpURLConnection
 
-                connection.requestMethod = "POST"
+                connection.requestMethod =
+                    "POST"
 
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
+                connection.connectTimeout =
+                    10000
 
-                connection.doOutput = true
+                connection.readTimeout =
+                    10000
+
+                connection.doOutput =
+                    true
 
                 connection.setRequestProperty(
                     "Content-Type",
@@ -590,30 +1016,35 @@ class MainActivity : AppCompatActivity() {
                     }
                     """.trimIndent()
 
-                connection.outputStream.use { output ->
+                connection.outputStream.use {
 
-                    output.write(
+                    it.write(
                         json.toByteArray(
                             Charsets.UTF_8
                         )
                     )
-
                 }
 
-                val code =
+                val responseCode =
                     connection.responseCode
 
                 val elapsed =
-                    System.currentTimeMillis() - start
-
-                connection.disconnect()
+                    System.currentTimeMillis() -
+                            start
 
                 runOnUiThread {
 
-                    if (code in 200..299) {
+                    if (!level1Running) {
+                        return@runOnUiThread
+                    }
+
+                    if (
+                        responseCode in
+                        200..299
+                    ) {
 
                         level1Result.text =
-                            "Online • $elapsed ms • HTTP $code"
+                            "ONLINE • $elapsed ms • HTTP $responseCode"
 
                         level1Result.setTextColor(
                             accent
@@ -622,7 +1053,7 @@ class MainActivity : AppCompatActivity() {
                     } else {
 
                         level1Result.text =
-                            "Server error • HTTP $code"
+                            "ERROR • HTTP $responseCode • $elapsed ms"
 
                         level1Result.setTextColor(
                             danger
@@ -634,59 +1065,124 @@ class MainActivity : AppCompatActivity() {
 
                 runOnUiThread {
 
+                    if (!level1Running) {
+                        return@runOnUiThread
+                    }
+
                     level1Result.text =
-                        "Offline / Error"
+                        "OFFLINE / ERROR"
 
                     level1Result.setTextColor(
                         danger
                     )
                 }
+
+            } finally {
+
+                connection?.disconnect()
             }
+
+            handler.postDelayed(
+                {
+                    runLevel1Cycle()
+                },
+                testInterval
+            )
 
         }.start()
     }
 
     // =========================================================
-    // SFTP SERVER TEST
+    // START SFTP
     // =========================================================
 
-    private fun testSftp() {
+    private fun startSftpTest() {
+
+        sftpRunning = true
+
+        sftpButton.text =
+            "STOP SFTP TEST"
+
+        sftpButton.setBackgroundColor(
+            danger
+        )
 
         sftpResult.text =
-            "Testing SFTP server..."
+            "LIVE TEST STARTED..."
 
-        sftpResult.setTextColor(primary)
+        sftpResult.setTextColor(
+            primary
+        )
+
+        runSftpCycle()
+    }
+
+    // =========================================================
+    // STOP SFTP
+    // =========================================================
+
+    private fun stopSftpTest() {
+
+        sftpRunning = false
+
+        sftpButton.text =
+            "START SFTP TEST"
+
+        sftpButton.setBackgroundColor(
+            primary
+        )
+
+        sftpResult.text =
+            "Test stopped"
+
+        sftpResult.setTextColor(
+            muted
+        )
+    }
+
+    // =========================================================
+    // SFTP CYCLE
+    // =========================================================
+
+    private fun runSftpCycle() {
+
+        if (!sftpRunning) {
+            return
+        }
 
         Thread {
+
+            var socket:
+                    Socket? = null
 
             try {
 
                 val start =
                     System.currentTimeMillis()
 
-                val address =
-                    InetSocketAddress(
-                        "snaps.pitc.com.pk",
-                        2232
-                    )
-
-                val socket =
+                socket =
                     Socket()
 
                 socket.connect(
-                    address,
-                    10000
+                    InetSocketAddress(
+                        "snaps.pitc.com.pk",
+                        2232
+                    ),
+                    5000
                 )
 
                 val elapsed =
-                    System.currentTimeMillis() - start
-
-                socket.close()
+                    System.currentTimeMillis() -
+                            start
 
                 runOnUiThread {
 
+                    if (!sftpRunning) {
+                        return@runOnUiThread
+                    }
+
                     sftpResult.text =
-                        "Server reachable • $elapsed ms"
+                        "ONLINE • $elapsed ms"
 
                     sftpResult.setTextColor(
                         accent
@@ -697,14 +1193,32 @@ class MainActivity : AppCompatActivity() {
 
                 runOnUiThread {
 
+                    if (!sftpRunning) {
+                        return@runOnUiThread
+                    }
+
                     sftpResult.text =
-                        "SFTP server unavailable"
+                        "OFFLINE / ERROR"
 
                     sftpResult.setTextColor(
                         danger
                     )
                 }
+
+            } finally {
+
+                try {
+                    socket?.close()
+                } catch (_: Exception) {
+                }
             }
+
+            handler.postDelayed(
+                {
+                    runSftpCycle()
+                },
+                testInterval
+            )
 
         }.start()
     }
@@ -765,7 +1279,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // LOAD SAVED EMAIL
+    // LOAD EMAIL
     // =========================================================
 
     private fun loadSavedEmail() {
@@ -873,7 +1387,9 @@ class MainActivity : AppCompatActivity() {
                 false
             )
 
-        card.addView(titleText)
+        card.addView(
+            titleText
+        )
 
         card.addView(
             value,
@@ -883,8 +1399,13 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        card.addView(upload)
-        card.addView(latency)
+        card.addView(
+            upload
+        )
+
+        card.addView(
+            latency
+        )
 
         return Pair(
             card,
@@ -911,7 +1432,9 @@ class MainActivity : AppCompatActivity() {
 
             textSize = 14f
 
-            setTextColor(white)
+            setTextColor(
+                white
+            )
 
             typeface =
                 Typeface.DEFAULT_BOLD
@@ -946,7 +1469,9 @@ class MainActivity : AppCompatActivity() {
 
             textSize = size
 
-            setTextColor(color)
+            setTextColor(
+                color
+            )
 
             typeface =
                 if (bold) {
@@ -970,7 +1495,9 @@ class MainActivity : AppCompatActivity() {
             .GradientDrawable()
             .apply {
 
-                setColor(color)
+                setColor(
+                    color
+                )
 
                 cornerRadius =
                     dp(radius).toFloat()
@@ -978,7 +1505,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // WEIGHT PARAMETERS
+    // WEIGHT PARAMS
     // =========================================================
 
     private fun weightParams(
@@ -1002,7 +1529,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // MARGIN PARAMETERS
+    // MARGIN PARAMS
     // =========================================================
 
     private fun marginParams(
@@ -1032,11 +1559,30 @@ class MainActivity : AppCompatActivity() {
     // DP
     // =========================================================
 
-    private fun dp(value: Int): Int {
+    private fun dp(
+        value: Int
+    ): Int {
 
         return (
             value *
-                resources.displayMetrics.density
+                    resources.displayMetrics.density
             ).toInt()
+    }
+
+    // =========================================================
+    // CLEANUP
+    // =========================================================
+
+    override fun onDestroy() {
+
+        internetRunning = false
+        level1Running = false
+        sftpRunning = false
+
+        handler.removeCallbacksAndMessages(
+            null
+        )
+
+        super.onDestroy()
     }
 }
