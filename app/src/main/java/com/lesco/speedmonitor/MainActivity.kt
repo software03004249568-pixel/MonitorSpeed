@@ -1,259 +1,958 @@
 package com.lesco.speedmonitor
 
-import android.content.Intent
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
-import android.net.Uri
+import android.graphics.Typeface
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 
 class MainActivity : AppCompatActivity() {
+
+    // Colors
+    private val bgColor = Color.rgb(10, 15, 25)
+    private val cardColor = Color.rgb(20, 27, 40)
+    private val white = Color.WHITE
+    private val muted = Color.rgb(170, 180, 195)
+    private val primary = Color.rgb(60, 150, 255)
+    private val accent = Color.rgb(45, 210, 140)
+    private val danger = Color.rgb(240, 80, 90)
+
+    // Internet values
     private lateinit var d: TextView
     private lateinit var u: TextView
     private lateinit var ping: TextView
-    private lateinit var status: TextView
-    private lateinit var l1: TextView
-    private lateinit var l1d: TextView
-    private lateinit var sftp: TextView
-    private lateinit var sftpd: TextView
-    private lateinit var email: EditText
-    private lateinit var alert: TextView
 
-    private val white = Color.rgb(245, 247, 250)
-    private val muted = Color.rgb(165, 174, 188)
-    private val primary = Color.rgb(80, 170, 255)
-    private val accent = Color.rgb(90, 220, 180)
-    private val danger = Color.rgb(255, 95, 105)
-    private val success = Color.rgb(90, 220, 140)
-    private val cardColor = Color.rgb(30, 38, 50)
-    private val bgColor = Color.rgb(15, 20, 28)
+    // Status
+    private lateinit var status: TextView
+
+    // Level-1
+    private lateinit var level1Result: TextView
+
+    // SFTP
+    private lateinit var sftpResult: TextView
+
+    // Email
+    private lateinit var emailInput: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(buildUi())
 
-        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        email.setText(prefs.getString("email", ""))
+        window.statusBarColor = bgColor
+        window.navigationBarColor = bgColor
+
+        setContentView(buildUi())
     }
 
     private fun buildUi(): ScrollView {
-        val scroll = ScrollView(this).apply { setBackgroundColor(bgColor) }
+
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(bgColor)
+            isFillViewport = true
+        }
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(20), dp(20), dp(24))
+            setPadding(
+                dp(20),
+                dp(20),
+                dp(20),
+                dp(24)
+            )
         }
-        scroll.addView(root, ViewGroup.LayoutParams(-1, -2))
 
-        root.addView(text("SPEED MONITOR", 27f, white, true))
-        root.addView(text("Internet • Level 1 • SFTP", 14f, muted, false).apply {
-            setPadding(0, 0, 0, dp(14))
-        })
+        scroll.addView(
+            root,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
 
-        val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        top.addView(statCard("INTERNET", primary).also { card ->
-            d = card.second[0]
-            u = card.second[1]
-            ping = card.second[2]
-        }, weightParams(1f, 6))
-        top.addView(statCard("STATUS", accent).also { card ->
-            status = card.second[0]
-        }, weightParams(1f, 6))
-        root.addView(top, LinearLayout.LayoutParams(-1, dp(150)))
+        // ---------------------------------------------------------
+        // HEADER
+        // ---------------------------------------------------------
 
-        val internetButton = button("TEST INTERNET SPEED")
-        internetButton.setOnClickListener { internet() }
-        root.addView(internetButton, marginParams(-1, 58, 14, 0))
+        root.addView(
+            text(
+                "SPEED MONITOR",
+                27f,
+                white,
+                true
+            )
+        )
 
-        val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val b1 = button("CHECK LEVEL 1")
-        val b2 = button("CHECK SFTP")
-        b1.setOnClickListener { level1() }
-        b2.setOnClickListener { sftpTest() }
-        buttons.addView(b1, weightParams(1f, 5))
-        buttons.addView(b2, weightParams(1f, 5))
-        root.addView(buttons, LinearLayout.LayoutParams(-1, dp(60)))
+        root.addView(
+            text(
+                "Internet • Level 1 • SFTP",
+                14f,
+                muted,
+                false
+            ).apply {
+                setPadding(0, 0, 0, dp(14))
+            }
+        )
 
-        val l1Card = simpleCard("LEVEL 1 SERVER", primary)
-        l1 = l1Card.first
-        l1d = l1Card.second
-        root.addView(l1Card.third, marginParams(-1, 110, 12, 0))
+        // ---------------------------------------------------------
+        // TOP CARDS
+        // ---------------------------------------------------------
 
-        val sftpCard = simpleCard("SFTP SERVER", accent)
-        sftp = sftpCard.first
-        sftpd = sftpCard.second
-        root.addView(sftpCard.third, marginParams(-1, 110, 12, 0))
+        val top = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
 
-        val alertCard = LinearLayout(this).apply {
+        val internetCard = statCard(
+            "INTERNET",
+            primary
+        )
+
+        d = internetCard.second[0]
+        u = internetCard.second[1]
+        ping = internetCard.second[2]
+
+        top.addView(
+            internetCard.first,
+            weightParams(1f, 6)
+        )
+
+        val statusCard = statCard(
+            "STATUS",
+            accent
+        )
+
+        status = statusCard.second[0]
+
+        statusCard.second[1].text = "Server"
+        statusCard.second[2].text = "Ready"
+
+        top.addView(
+            statusCard.first,
+            weightParams(1f, 6)
+        )
+
+        root.addView(
+            top,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(150)
+            )
+        )
+
+        // ---------------------------------------------------------
+        // INTERNET TEST BUTTON
+        // ---------------------------------------------------------
+
+        root.addView(
+            button(
+                "TEST INTERNET SPEED",
+                primary
+            ).apply {
+
+                setOnClickListener {
+                    testInternet()
+                }
+
+            },
+            marginParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(52),
+                0,
+                0,
+                0,
+                14
+            )
+        )
+
+        // ---------------------------------------------------------
+        // LEVEL 1 SECTION
+        // ---------------------------------------------------------
+
+        root.addView(
+            sectionTitle(
+                "LEVEL 1 SERVER"
+            )
+        )
+
+        val level1Card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(17), dp(14), dp(17), dp(14))
-            background = rounded(cardColor, 14)
+            setPadding(
+                dp(16),
+                dp(14),
+                dp(16),
+                dp(14)
+            )
+            background = rounded(
+                cardColor,
+                14
+            )
         }
-        alertCard.addView(text("SERVER DOWN ALERT", 14f, danger, true))
-        email = EditText(this).apply {
-            hint = "Alert email address"
+
+        level1Result = text(
+            "Not tested",
+            16f,
+            muted,
+            false
+        )
+
+        level1Card.addView(level1Result)
+
+        level1Card.addView(
+            text(
+                "Server: usersnap.pitc.com.pk",
+                13f,
+                muted,
+                false
+            ).apply {
+                setPadding(0, dp(6), 0, 0)
+            }
+        )
+
+        root.addView(
+            level1Card,
+            marginParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                0,
+                0,
+                0,
+                10
+            )
+        )
+
+        root.addView(
+            button(
+                "TEST LEVEL 1",
+                accent
+            ).apply {
+
+                setOnClickListener {
+                    testLevel1()
+                }
+
+            },
+            marginParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(50),
+                0,
+                0,
+                0,
+                18
+            )
+        )
+
+        // ---------------------------------------------------------
+        // SFTP SECTION
+        // ---------------------------------------------------------
+
+        root.addView(
+            sectionTitle(
+                "SFTP SERVER"
+            )
+        )
+
+        val sftpCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(
+                dp(16),
+                dp(14),
+                dp(16),
+                dp(14)
+            )
+            background = rounded(
+                cardColor,
+                14
+            )
+        }
+
+        sftpResult = text(
+            "Not tested",
+            16f,
+            muted,
+            false
+        )
+
+        sftpCard.addView(sftpResult)
+
+        sftpCard.addView(
+            text(
+                "Server: snaps.pitc.com.pk",
+                13f,
+                muted,
+                false
+            ).apply {
+                setPadding(0, dp(6), 0, 0)
+            }
+        )
+
+        root.addView(
+            sftpCard,
+            marginParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                0,
+                0,
+                0,
+                10
+            )
+        )
+
+        root.addView(
+            button(
+                "TEST SFTP",
+                primary
+            ).apply {
+
+                setOnClickListener {
+                    testSftp()
+                }
+
+            },
+            marginParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(50),
+                0,
+                0,
+                0,
+                18
+            )
+        )
+
+        // ---------------------------------------------------------
+        // EMAIL ALERT
+        // ---------------------------------------------------------
+
+        root.addView(
+            sectionTitle(
+                "SERVER DOWN ALERT"
+            )
+        )
+
+        emailInput = EditText(this).apply {
+
+            hint = "Enter email address"
+
+            hintTextColor = muted
             setTextColor(white)
-            setHintTextColor(muted)
-            setSingleLine(true)
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+
+            textSize = 15f
+
+            singleLine = true
+
+            setPadding(
+                dp(14),
+                0,
+                dp(14),
+                0
+            )
+
+            background = rounded(
+                cardColor,
+                12
+            )
         }
-        alertCard.addView(email, LinearLayout.LayoutParams(-1, dp(55)))
 
-        val emailButtons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val save = button("SAVE EMAIL")
-        val send = button("SEND EMAIL")
-        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        save.setOnClickListener {
-            prefs.edit().putString("email", email.text.toString().trim()).apply()
-            alert.text = "Alert email saved"
+        root.addView(
+            emailInput,
+            marginParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(52),
+                0,
+                0,
+                0,
+                10
+            )
+        )
+
+        root.addView(
+            button(
+                "SAVE EMAIL",
+                accent
+            ).apply {
+
+                setOnClickListener {
+                    saveEmail()
+                }
+
+            },
+            marginParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(50),
+                0,
+                0,
+                0,
+                20
+            )
+        )
+
+        // ---------------------------------------------------------
+        // FOOTER
+        // ---------------------------------------------------------
+
+        val footer = text(
+            "LESCO IT Directorate",
+            13f,
+            muted,
+            false
+        ).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(8), 0, dp(8))
         }
-        send.setOnClickListener { sendMail("Server Status Alert", "Please check Level 1 / SFTP server status.") }
-        emailButtons.addView(save, weightParams(1f, 5))
-        emailButtons.addView(send, weightParams(1f, 5))
-        alertCard.addView(emailButtons, LinearLayout.LayoutParams(-1, dp(55)))
 
-        alert = text("No alert", 13f, muted, false)
-        alertCard.addView(alert)
-        root.addView(alertCard, marginParams(-1, -2, 0, 0))
-
-        status.text = "READY"
-        l1.text = "Not checked"
-        l1d.text = "Response time"
-        sftp.text = "Not checked"
-        sftpd.text = "Connection / transfer speed"
-        d.text = "-- Mbps"
-        u.text = "↑ -- Mbps"
-        ping.text = "Ping -- ms"
+        root.addView(
+            footer,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
 
         return scroll
     }
 
-    private fun statCard(title: String, titleColor: Int): Pair<LinearLayout, Array<TextView>> {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(17), dp(15), dp(17), dp(12))
-            background = rounded(cardColor, 14)
+    // =============================================================
+    // INTERNET TEST
+    // =============================================================
+
+    private fun testInternet() {
+
+        status.text = "Testing..."
+        status.setTextColor(primary)
+
+        d.text = "-- Mbps"
+        u.text = "↑ -- Mbps"
+        ping.text = "Ping -- ms"
+
+        Thread {
+
+            try {
+
+                val start = System.currentTimeMillis()
+
+                val runtime = Runtime.getRuntime()
+
+                val process = runtime.exec(
+                    arrayOf(
+                        "ping",
+                        "-c",
+                        "1",
+                        "-W",
+                        "2",
+                        "8.8.8.8"
+                    )
+                )
+
+                process.waitFor()
+
+                val elapsed =
+                    System.currentTimeMillis() - start
+
+                val reachable =
+                    process.exitValue() == 0
+
+                runOnUiThread {
+
+                    if (reachable) {
+
+                        ping.text =
+                            "Ping $elapsed ms"
+
+                        status.text =
+                            "Online"
+
+                        status.setTextColor(accent)
+
+                        // Basic measured connectivity.
+                        // Real download/upload speed test can
+                        // be connected here later.
+                        d.text =
+                            "Online"
+
+                        u.text =
+                            "↑ Connected"
+
+                    } else {
+
+                        status.text =
+                            "Offline"
+
+                        status.setTextColor(danger)
+
+                        d.text =
+                            "-- Mbps"
+
+                        u.text =
+                            "↑ -- Mbps"
+
+                        ping.text =
+                            "Ping -- ms"
+                    }
+                }
+
+            } catch (ex: Exception) {
+
+                runOnUiThread {
+
+                    status.text =
+                        "Error"
+
+                    status.setTextColor(danger)
+
+                    d.text =
+                        "-- Mbps"
+
+                    u.text =
+                        "↑ -- Mbps"
+
+                    ping.text =
+                        "Ping -- ms"
+                }
+            }
+        }.start()
+    }
+
+    // =============================================================
+    // LEVEL 1 TEST
+    // =============================================================
+
+    private fun testLevel1() {
+
+        level1Result.text =
+            "Testing Level-1 server..."
+
+        level1Result.setTextColor(primary)
+
+        Thread {
+
+            try {
+
+                val start =
+                    System.currentTimeMillis()
+
+                val url =
+                    java.net.URL(
+                        "https://usersnap.pitc.com.pk/api/SnapsForPrinting/ToPrinting"
+                    )
+
+                val connection =
+                    url.openConnection()
+                            as java.net.HttpURLConnection
+
+                connection.requestMethod = "POST"
+
+                connection.connectTimeout =
+                    10000
+
+                connection.readTimeout =
+                    10000
+
+                connection.doOutput = true
+
+                connection.setRequestProperty(
+                    "Content-Type",
+                    "application/json"
+                )
+
+                val json =
+                    """
+                    {
+                      "BATCH":"01",
+                      "DIV":"11164",
+                      "CC_CODE":"1101",
+                      "BILL_MONTH":"01-May-2026",
+                      "PAGE_NUMBER":"1"
+                    }
+                    """.trimIndent()
+
+                connection.outputStream.use { output ->
+
+                    output.write(
+                        json.toByteArray(
+                            Charsets.UTF_8
+                        )
+                    )
+                }
+
+                val code =
+                    connection.responseCode
+
+                val elapsed =
+                    System.currentTimeMillis() - start
+
+                connection.disconnect()
+
+                runOnUiThread {
+
+                    if (code in 200..299) {
+
+                        level1Result.text =
+                            "Online • $elapsed ms • HTTP $code"
+
+                        level1Result.setTextColor(
+                            accent
+                        )
+
+                    } else {
+
+                        level1Result.text =
+                            "Server error • HTTP $code"
+
+                        level1Result.setTextColor(
+                            danger
+                        )
+                    }
+                }
+
+            } catch (ex: Exception) {
+
+                runOnUiThread {
+
+                    level1Result.text =
+                        "Offline / Error"
+
+                    level1Result.setTextColor(
+                        danger
+                    )
+                }
+            }
+
+        }.start()
+    }
+
+    // =============================================================
+    // SFTP TEST
+    // =============================================================
+
+    private fun testSftp() {
+
+        sftpResult.text =
+            "Testing SFTP server..."
+
+        sftpResult.setTextColor(primary)
+
+        Thread {
+
+            try {
+
+                val start =
+                    System.currentTimeMillis()
+
+                val address =
+                    java.net.InetSocketAddress(
+                        "snaps.pitc.com.pk",
+                        2232
+                    )
+
+                val socket =
+                    java.net.Socket()
+
+                socket.connect(
+                    address,
+                    10000
+                )
+
+                val elapsed =
+                    System.currentTimeMillis() - start
+
+                socket.close()
+
+                runOnUiThread {
+
+                    sftpResult.text =
+                        "Server reachable • $elapsed ms"
+
+                    sftpResult.setTextColor(
+                        accent
+                    )
+                }
+
+            } catch (ex: Exception) {
+
+                runOnUiThread {
+
+                    sftpResult.text =
+                        "SFTP server unavailable"
+
+                    sftpResult.setTextColor(
+                        danger
+                    )
+                }
+            }
+
+        }.start()
+    }
+
+    // =============================================================
+    // SAVE EMAIL
+    // =============================================================
+
+    private fun saveEmail() {
+
+        val email =
+            emailInput.text
+                .toString()
+                .trim()
+
+        if (email.isEmpty()) {
+
+            Toast.makeText(
+                this,
+                "Please enter email address",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
         }
-        card.addView(text(title, 13f, titleColor, true))
-        val a = text("-- Mbps", 25f, white, true)
-        val b = text("↑ -- Mbps", 14f, muted, false)
-        val c = text("Ping -- ms", 14f, muted, false)
-        card.addView(a, LinearLayout.LayoutParams(-1, dp(40)))
+
+        if (!android.util.Patterns.EMAIL_ADDRESS
+                .matcher(email)
+                .matches()
+        ) {
+
+            Toast.makeText(
+                this,
+                "Invalid email address",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        getSharedPreferences(
+            "SpeedMonitor",
+            MODE_PRIVATE
+        )
+            .edit()
+            .putString(
+                "alert_email",
+                email
+            )
+            .apply()
+
+        Toast.makeText(
+            this,
+            "Email saved successfully",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    // =============================================================
+    // UI HELPERS
+    // =============================================================
+
+    private fun statCard(
+        title: String,
+        titleColor: Int
+    ): Pair<LinearLayout, Array<TextView>> {
+
+        val card =
+            LinearLayout(this).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    dp(17),
+                    dp(15),
+                    dp(17),
+                    dp(12)
+                )
+
+                background =
+                    rounded(
+                        cardColor,
+                        14
+                    )
+            }
+
+        val a =
+            text(
+                "-- Mbps",
+                25f,
+                white,
+                true
+            )
+
+        val b =
+            text(
+                "↑ -- Mbps",
+                14f,
+                muted,
+                false
+            )
+
+        val c =
+            text(
+                "Ping -- ms",
+                14f,
+                muted,
+                false
+            )
+
+        card.addView(
+            text(
+                title,
+                13f,
+                titleColor,
+                true
+            )
+        )
+
+        card.addView(
+            a,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(40)
+            )
+        )
+
         card.addView(b)
         card.addView(c)
-        return Pair(card, arrayOf(a, b, c))
+
+        return Pair(
+            card,
+            arrayOf(a, b, c)
+        )
     }
 
-    private fun simpleCard(title: String, color: Int): Triple<TextView, TextView, LinearLayout> {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(17), dp(14), dp(17), dp(12))
-            background = rounded(cardColor, 14)
-        }
-        card.addView(text(title, 13f, color, true))
-        val value = text("Not checked", 21f, white, true)
-        val detail = text("Response time", 13f, muted, false)
-        card.addView(value)
-        card.addView(detail)
-        return Triple(value, detail, card)
-    }
+    private fun sectionTitle(
+        value: String
+    ): TextView {
 
-    private fun text(value: String, size: Float, color: Int, bold: Boolean): TextView = TextView(this).apply {
-        text = value
-        textSize = size
-        setTextColor(color)
-        if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
-    }
+        return text(
+            value,
+            15f,
+            white,
+            true
+        ).apply {
 
-    private fun button(label: String): Button = Button(this).apply {
-        text = label
-        isAllCaps = false
-    }
-
-    private fun rounded(color: Int, radius: Int): GradientDrawable = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = dp(radius).toFloat()
-    }
-
-    private fun weightParams(weight: Float, margin: Int): LinearLayout.LayoutParams = LinearLayout.LayoutParams(0, -1, weight).apply {
-        setMargins(dp(margin), 0, dp(margin), 0)
-    }
-
-    private fun marginParams(width: Int, height: Int, top: Int, bottom: Int): LinearLayout.LayoutParams = LinearLayout.LayoutParams(width, if (height == -2) -2 else dp(height)).apply {
-        setMargins(0, dp(top), 0, dp(bottom))
-    }
-
-    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
-
-    private fun internet() {
-        status.text = "TESTING"
-        lifecycleScope.launch {
-            val r = withContext(Dispatchers.IO) { pingTest() }
-            ping.text = if (r >= 0) "Ping ${r} ms" else "Ping -- ms"
-            status.text = if (r >= 0) "ONLINE" else "OFFLINE"
-            d.text = "-- Mbps"
-            u.text = "↑ -- Mbps"
+            setPadding(
+                dp(2),
+                dp(2),
+                dp(2),
+                dp(8)
+            )
         }
     }
 
-    private fun level1() {
-        status.text = "LEVEL 1"
-        lifecycleScope.launch {
-            val r = withContext(Dispatchers.IO) { level1Test() }
-            l1.text = if (r.ok) "● ONLINE" else "● DOWN"
-            l1d.text = "Response ${r.ms} ms"
-            if (!r.ok) {
-                alert.text = "⚠ Level 1 Server is DOWN"
-                sendMail("Level 1 Server Down", "Level 1 server is not responding. Response: ${r.ms} ms")
+    private fun button(
+        value: String,
+        color: Int
+    ): Button {
+
+        return Button(this).apply {
+
+            text = value
+
+            textSize = 14f
+
+            setTextColor(white)
+
+            typeface =
+                Typeface.DEFAULT_BOLD
+
+            isAllCaps = false
+
+            background =
+                rounded(
+                    color,
+                    12
+                )
+
+            elevation =
+                dp(2).toFloat()
+        }
+    }
+
+    private fun text(
+        value: String,
+        size: Float,
+        color: Int,
+        bold: Boolean
+    ): TextView {
+
+        return TextView(this).apply {
+
+            text = value
+
+            textSize = size
+
+            setTextColor(color)
+
+            typeface =
+                if (bold) {
+                    Typeface.DEFAULT_BOLD
+                } else {
+                    Typeface.DEFAULT
+                }
+        }
+    }
+
+    private fun rounded(
+        color: Int,
+        radius: Int
+    ): android.graphics.drawable.GradientDrawable {
+
+        return android.graphics.drawable
+            .GradientDrawable()
+            .apply {
+
+                setColor(color)
+
+                cornerRadius =
+                    dp(radius).toFloat()
             }
+    }
+
+    private fun weightParams(
+        weight: Float,
+        margin: Int
+    ): LinearLayout.LayoutParams {
+
+        return LinearLayout.LayoutParams(
+            0,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            weight
+        ).apply {
+
+            setMargins(
+                dp(margin),
+                0,
+                dp(margin),
+                0
+            )
         }
     }
 
-    private fun sftpTest() {
-        status.text = "SFTP"
-        sftp.text = "MODULE READY"
-        sftpd.text = "SFTP transfer-speed test will use a controlled test file and bytes/time calculation."
+    private fun marginParams(
+        width: Int,
+        height: Int,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int
+    ): LinearLayout.LayoutParams {
+
+        return LinearLayout.LayoutParams(
+            width,
+            height
+        ).apply {
+
+            setMargins(
+                dp(left),
+                dp(top),
+                dp(right),
+                dp(bottom)
+            )
+        }
     }
 
-    private fun pingTest(): Long = try {
-        val t = System.currentTimeMillis()
-        val c = URL("https://www.google.com/generate_204").openConnection() as HttpURLConnection
-        c.connectTimeout = 5000
-        c.readTimeout = 5000
-        c.connect()
-        c.disconnect()
-        System.currentTimeMillis() - t
-    } catch (_: Exception) { -1 }
+    private fun dp(value: Int): Int {
 
-    private fun level1Test(): Result = try {
-        val t = System.currentTimeMillis()
-        val c = URL("https://usersnap.pitc.com.pk/api/SnapsForPrinting/ToPrinting").openConnection() as HttpURLConnection
-        c.requestMethod = "POST"
-        c.connectTimeout = 10000
-        c.readTimeout = 40000
-        c.doOutput = true
-        c.setRequestProperty("Content-Type", "application/json")
-        c.outputStream.use { it.write("""{"BATCH":"01","DIV":"11164","CC_CODE":"1101","BILL_MONTH":"01-May-2026","PAGE_NUMBER":"1"}""".toByteArray()) }
-        val response = c.inputStream.bufferedReader().use { it.readText() }
-        c.disconnect()
-        Result(response.contains("TOTAL_RECORDS") || response.contains("READY_FOR_UPLOAD") || response.contains("SNAP_1"), System.currentTimeMillis() - t)
-    } catch (_: Exception) { Result(false, 0) }
-
-    private fun sendMail(subject: String, body: String) {
-        val to = email.text.toString().trim()
-        if (to.isEmpty()) { alert.text = "Save an alert email first"; return }
-        val i = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$to"))
-        i.putExtra(Intent.EXTRA_SUBJECT, subject)
-        i.putExtra(Intent.EXTRA_TEXT, body)
-        try { startActivity(i) } catch (_: Exception) { alert.text = "No email app available" }
+        return (
+            value *
+                resources.displayMetrics.density
+            ).toInt()
     }
-
-    data class Result(val ok: Boolean, val ms: Long)
 }
