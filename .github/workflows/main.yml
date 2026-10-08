@@ -8,8 +8,11 @@ on:
 
 jobs:
   build:
-    name: Build Speed Monitor APK
     runs-on: ubuntu-latest
+
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
 
@@ -22,22 +25,35 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          log-accepted-android-sdk-licenses: true
-
-      - name: Accept Android SDK Licenses
+      - name: Configure Android SDK
         shell: bash
         run: |
-          yes | sdkmanager --licenses || true
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+          if [ ! -f "$SDKMANAGER" ]; then
+            echo "sdkmanager not found"
+            find "$ANDROID_HOME" -name sdkmanager -type f
+            exit 1
+          fi
+
+          echo "Using sdkmanager:"
+          "$SDKMANAGER" --version
+
+          echo "Accepting Android SDK licenses..."
+          yes | "$SDKMANAGER" --licenses
 
       - name: Install Android SDK Packages
         shell: bash
         run: |
-          sdkmanager "platform-tools"
-          sdkmanager "platforms;android-35"
-          sdkmanager "build-tools;35.0.0"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
