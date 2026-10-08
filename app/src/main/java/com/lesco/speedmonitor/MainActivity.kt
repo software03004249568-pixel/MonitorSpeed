@@ -6,12 +6,24 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.*
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
-    // Colors
+    // =========================================================
+    // COLORS
+    // =========================================================
+
     private val bgColor = Color.rgb(10, 15, 25)
     private val cardColor = Color.rgb(20, 27, 40)
     private val white = Color.WHITE
@@ -20,22 +32,24 @@ class MainActivity : AppCompatActivity() {
     private val accent = Color.rgb(45, 210, 140)
     private val danger = Color.rgb(240, 80, 90)
 
-    // Internet values
+    // =========================================================
+    // UI VARIABLES
+    // =========================================================
+
     private lateinit var d: TextView
     private lateinit var u: TextView
     private lateinit var ping: TextView
 
-    // Status
     private lateinit var status: TextView
 
-    // Level-1
     private lateinit var level1Result: TextView
-
-    // SFTP
     private lateinit var sftpResult: TextView
 
-    // Email
     private lateinit var emailInput: EditText
+
+    // =========================================================
+    // ON CREATE
+    // =========================================================
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,7 +58,13 @@ class MainActivity : AppCompatActivity() {
         window.navigationBarColor = bgColor
 
         setContentView(buildUi())
+
+        loadSavedEmail()
     }
+
+    // =========================================================
+    // BUILD UI
+    // =========================================================
 
     private fun buildUi(): ScrollView {
 
@@ -55,6 +75,7 @@ class MainActivity : AppCompatActivity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+
             setPadding(
                 dp(20),
                 dp(20),
@@ -71,9 +92,9 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        // ---------------------------------------------------------
+        // =====================================================
         // HEADER
-        // ---------------------------------------------------------
+        // =====================================================
 
         root.addView(
             text(
@@ -91,17 +112,24 @@ class MainActivity : AppCompatActivity() {
                 muted,
                 false
             ).apply {
-                setPadding(0, 0, 0, dp(14))
+                setPadding(
+                    0,
+                    0,
+                    0,
+                    dp(14)
+                )
             }
         )
 
-        // ---------------------------------------------------------
+        // =====================================================
         // TOP CARDS
-        // ---------------------------------------------------------
+        // =====================================================
 
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
+
+        // INTERNET CARD
 
         val internetCard = statCard(
             "INTERNET",
@@ -116,6 +144,8 @@ class MainActivity : AppCompatActivity() {
             internetCard.first,
             weightParams(1f, 6)
         )
+
+        // STATUS CARD
 
         val statusCard = statCard(
             "STATUS",
@@ -140,9 +170,9 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        // ---------------------------------------------------------
-        // INTERNET TEST BUTTON
-        // ---------------------------------------------------------
+        // =====================================================
+        // INTERNET BUTTON
+        // =====================================================
 
         root.addView(
             button(
@@ -161,28 +191,29 @@ class MainActivity : AppCompatActivity() {
                 0,
                 0,
                 0,
-                14
+                18
             )
         )
 
-        // ---------------------------------------------------------
-        // LEVEL 1 SECTION
-        // ---------------------------------------------------------
+        // =====================================================
+        // LEVEL 1
+        // =====================================================
 
         root.addView(
-            sectionTitle(
-                "LEVEL 1 SERVER"
-            )
+            sectionTitle("LEVEL 1 SERVER")
         )
 
         val level1Card = LinearLayout(this).apply {
+
             orientation = LinearLayout.VERTICAL
+
             setPadding(
                 dp(16),
                 dp(14),
                 dp(16),
                 dp(14)
             )
+
             background = rounded(
                 cardColor,
                 14
@@ -196,7 +227,9 @@ class MainActivity : AppCompatActivity() {
             false
         )
 
-        level1Card.addView(level1Result)
+        level1Card.addView(
+            level1Result
+        )
 
         level1Card.addView(
             text(
@@ -205,7 +238,13 @@ class MainActivity : AppCompatActivity() {
                 muted,
                 false
             ).apply {
-                setPadding(0, dp(6), 0, 0)
+
+                setPadding(
+                    0,
+                    dp(6),
+                    0,
+                    0
+                )
             }
         )
 
@@ -242,24 +281,25 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        // ---------------------------------------------------------
-        // SFTP SECTION
-        // ---------------------------------------------------------
+        // =====================================================
+        // SFTP
+        // =====================================================
 
         root.addView(
-            sectionTitle(
-                "SFTP SERVER"
-            )
+            sectionTitle("SFTP SERVER")
         )
 
         val sftpCard = LinearLayout(this).apply {
+
             orientation = LinearLayout.VERTICAL
+
             setPadding(
                 dp(16),
                 dp(14),
                 dp(16),
                 dp(14)
             )
+
             background = rounded(
                 cardColor,
                 14
@@ -273,16 +313,24 @@ class MainActivity : AppCompatActivity() {
             false
         )
 
-        sftpCard.addView(sftpResult)
+        sftpCard.addView(
+            sftpResult
+        )
 
         sftpCard.addView(
             text(
-                "Server: snaps.pitc.com.pk",
+                "Server: snaps.pitc.com.pk : 2232",
                 13f,
                 muted,
                 false
             ).apply {
-                setPadding(0, dp(6), 0, 0)
+
+                setPadding(
+                    0,
+                    dp(6),
+                    0,
+                    0
+                )
             }
         )
 
@@ -319,26 +367,25 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        // ---------------------------------------------------------
+        // =====================================================
         // EMAIL ALERT
-        // ---------------------------------------------------------
+        // =====================================================
 
         root.addView(
-            sectionTitle(
-                "SERVER DOWN ALERT"
-            )
+            sectionTitle("SERVER DOWN ALERT")
         )
 
         emailInput = EditText(this).apply {
 
             hint = "Enter email address"
 
-            hintTextColor = muted
+            setHintTextColor(muted)
+
             setTextColor(white)
 
             textSize = 15f
 
-            singleLine = true
+            setSingleLine(true)
 
             setPadding(
                 dp(14),
@@ -386,34 +433,35 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        // ---------------------------------------------------------
+        // =====================================================
         // FOOTER
-        // ---------------------------------------------------------
-
-        val footer = text(
-            "LESCO IT Directorate",
-            13f,
-            muted,
-            false
-        ).apply {
-            gravity = Gravity.CENTER
-            setPadding(0, dp(8), 0, dp(8))
-        }
+        // =====================================================
 
         root.addView(
-            footer,
-            ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+            text(
+                "LESCO IT Directorate",
+                13f,
+                muted,
+                false
+            ).apply {
+
+                gravity = Gravity.CENTER
+
+                setPadding(
+                    0,
+                    dp(8),
+                    0,
+                    dp(8)
+                )
+            }
         )
 
         return scroll
     }
 
-    // =============================================================
+    // =========================================================
     // INTERNET TEST
-    // =============================================================
+    // =========================================================
 
     private fun testInternet() {
 
@@ -428,11 +476,10 @@ class MainActivity : AppCompatActivity() {
 
             try {
 
-                val start = System.currentTimeMillis()
+                val start =
+                    System.currentTimeMillis()
 
-                val runtime = Runtime.getRuntime()
-
-                val process = runtime.exec(
+                val process = Runtime.getRuntime().exec(
                     arrayOf(
                         "ping",
                         "-c",
@@ -455,17 +502,12 @@ class MainActivity : AppCompatActivity() {
 
                     if (reachable) {
 
+                        status.text = "Online"
+                        status.setTextColor(accent)
+
                         ping.text =
                             "Ping $elapsed ms"
 
-                        status.text =
-                            "Online"
-
-                        status.setTextColor(accent)
-
-                        // Basic measured connectivity.
-                        // Real download/upload speed test can
-                        // be connected here later.
                         d.text =
                             "Online"
 
@@ -474,19 +516,12 @@ class MainActivity : AppCompatActivity() {
 
                     } else {
 
-                        status.text =
-                            "Offline"
-
+                        status.text = "Offline"
                         status.setTextColor(danger)
 
-                        d.text =
-                            "-- Mbps"
-
-                        u.text =
-                            "↑ -- Mbps"
-
-                        ping.text =
-                            "Ping -- ms"
+                        d.text = "-- Mbps"
+                        u.text = "↑ -- Mbps"
+                        ping.text = "Ping -- ms"
                     }
                 }
 
@@ -494,27 +529,21 @@ class MainActivity : AppCompatActivity() {
 
                 runOnUiThread {
 
-                    status.text =
-                        "Error"
-
+                    status.text = "Error"
                     status.setTextColor(danger)
 
-                    d.text =
-                        "-- Mbps"
-
-                    u.text =
-                        "↑ -- Mbps"
-
-                    ping.text =
-                        "Ping -- ms"
+                    d.text = "-- Mbps"
+                    u.text = "↑ -- Mbps"
+                    ping.text = "Ping -- ms"
                 }
             }
+
         }.start()
     }
 
-    // =============================================================
+    // =========================================================
     // LEVEL 1 TEST
-    // =============================================================
+    // =========================================================
 
     private fun testLevel1() {
 
@@ -530,22 +559,18 @@ class MainActivity : AppCompatActivity() {
                 val start =
                     System.currentTimeMillis()
 
-                val url =
-                    java.net.URL(
-                        "https://usersnap.pitc.com.pk/api/SnapsForPrinting/ToPrinting"
-                    )
+                val url = URL(
+                    "https://usersnap.pitc.com.pk/api/SnapsForPrinting/ToPrinting"
+                )
 
                 val connection =
                     url.openConnection()
-                            as java.net.HttpURLConnection
+                            as HttpURLConnection
 
                 connection.requestMethod = "POST"
 
-                connection.connectTimeout =
-                    10000
-
-                connection.readTimeout =
-                    10000
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
 
                 connection.doOutput = true
 
@@ -557,11 +582,11 @@ class MainActivity : AppCompatActivity() {
                 val json =
                     """
                     {
-                      "BATCH":"01",
-                      "DIV":"11164",
-                      "CC_CODE":"1101",
-                      "BILL_MONTH":"01-May-2026",
-                      "PAGE_NUMBER":"1"
+                        "BATCH":"01",
+                        "DIV":"11164",
+                        "CC_CODE":"1101",
+                        "BILL_MONTH":"01-May-2026",
+                        "PAGE_NUMBER":"1"
                     }
                     """.trimIndent()
 
@@ -572,6 +597,7 @@ class MainActivity : AppCompatActivity() {
                             Charsets.UTF_8
                         )
                     )
+
                 }
 
                 val code =
@@ -620,9 +646,9 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    // =============================================================
-    // SFTP TEST
-    // =============================================================
+    // =========================================================
+    // SFTP SERVER TEST
+    // =========================================================
 
     private fun testSftp() {
 
@@ -639,13 +665,13 @@ class MainActivity : AppCompatActivity() {
                     System.currentTimeMillis()
 
                 val address =
-                    java.net.InetSocketAddress(
+                    InetSocketAddress(
                         "snaps.pitc.com.pk",
                         2232
                     )
 
                 val socket =
-                    java.net.Socket()
+                    Socket()
 
                 socket.connect(
                     address,
@@ -683,9 +709,9 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    // =============================================================
+    // =========================================================
     // SAVE EMAIL
-    // =============================================================
+    // =========================================================
 
     private fun saveEmail() {
 
@@ -705,7 +731,8 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        if (!android.util.Patterns.EMAIL_ADDRESS
+        if (
+            !android.util.Patterns.EMAIL_ADDRESS
                 .matcher(email)
                 .matches()
         ) {
@@ -737,9 +764,57 @@ class MainActivity : AppCompatActivity() {
         ).show()
     }
 
-    // =============================================================
-    // UI HELPERS
-    // =============================================================
+    // =========================================================
+    // LOAD SAVED EMAIL
+    // =========================================================
+
+    private fun loadSavedEmail() {
+
+        val savedEmail =
+            getSharedPreferences(
+                "SpeedMonitor",
+                MODE_PRIVATE
+            )
+                .getString(
+                    "alert_email",
+                    ""
+                )
+
+        if (!savedEmail.isNullOrEmpty()) {
+
+            emailInput.setText(
+                savedEmail
+            )
+        }
+    }
+
+    // =========================================================
+    // SECTION TITLE
+    // =========================================================
+
+    private fun sectionTitle(
+        value: String
+    ): TextView {
+
+        return text(
+            value,
+            15f,
+            white,
+            true
+        ).apply {
+
+            setPadding(
+                dp(2),
+                dp(2),
+                dp(2),
+                dp(8)
+            )
+        }
+    }
+
+    // =========================================================
+    // STAT CARD
+    // =========================================================
 
     private fun statCard(
         title: String,
@@ -766,7 +841,15 @@ class MainActivity : AppCompatActivity() {
                     )
             }
 
-        val a =
+        val titleText =
+            text(
+                title,
+                13f,
+                titleColor,
+                true
+            )
+
+        val value =
             text(
                 "-- Mbps",
                 25f,
@@ -774,7 +857,7 @@ class MainActivity : AppCompatActivity() {
                 true
             )
 
-        val b =
+        val upload =
             text(
                 "↑ -- Mbps",
                 14f,
@@ -782,7 +865,7 @@ class MainActivity : AppCompatActivity() {
                 false
             )
 
-        val c =
+        val latency =
             text(
                 "Ping -- ms",
                 14f,
@@ -790,51 +873,32 @@ class MainActivity : AppCompatActivity() {
                 false
             )
 
-        card.addView(
-            text(
-                title,
-                13f,
-                titleColor,
-                true
-            )
-        )
+        card.addView(titleText)
 
         card.addView(
-            a,
+            value,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(40)
             )
         )
 
-        card.addView(b)
-        card.addView(c)
+        card.addView(upload)
+        card.addView(latency)
 
         return Pair(
             card,
-            arrayOf(a, b, c)
+            arrayOf(
+                value,
+                upload,
+                latency
+            )
         )
     }
 
-    private fun sectionTitle(
-        value: String
-    ): TextView {
-
-        return text(
-            value,
-            15f,
-            white,
-            true
-        ).apply {
-
-            setPadding(
-                dp(2),
-                dp(2),
-                dp(2),
-                dp(8)
-            )
-        }
-    }
+    // =========================================================
+    // BUTTON
+    // =========================================================
 
     private fun button(
         value: String,
@@ -865,6 +929,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // =========================================================
+    // TEXT
+    // =========================================================
+
     private fun text(
         value: String,
         size: Float,
@@ -889,6 +957,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // =========================================================
+    // ROUNDED BACKGROUND
+    // =========================================================
+
     private fun rounded(
         color: Int,
         radius: Int
@@ -904,6 +976,10 @@ class MainActivity : AppCompatActivity() {
                     dp(radius).toFloat()
             }
     }
+
+    // =========================================================
+    // WEIGHT PARAMETERS
+    // =========================================================
 
     private fun weightParams(
         weight: Float,
@@ -924,6 +1000,10 @@ class MainActivity : AppCompatActivity() {
             )
         }
     }
+
+    // =========================================================
+    // MARGIN PARAMETERS
+    // =========================================================
 
     private fun marginParams(
         width: Int,
@@ -947,6 +1027,10 @@ class MainActivity : AppCompatActivity() {
             )
         }
     }
+
+    // =========================================================
+    // DP
+    // =========================================================
 
     private fun dp(value: Int): Int {
 
