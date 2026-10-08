@@ -1,0 +1,5 @@
+<resources>
+<color name="bg">#07111F</color><color name="card">#101D30</color><color name="primary">#38D7FF</color>
+<color name="accent">#8164FF</color><color name="success">#29E39A</color><color name="warning">#FFC857</color>
+<color name="danger">#FF5571</color><color name="text">#F5F9FF</color><color name="muted">#91A4BC</color>
+</resources>

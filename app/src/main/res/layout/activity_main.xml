@@ -1,0 +1,47 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/bg">
+<LinearLayout android:orientation="vertical" android:padding="20dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+<TextView android:text="SPEED MONITOR" android:textColor="@color/text" android:textSize="27sp" android:textStyle="bold"/>
+<TextView android:text="Internet • Level 1 • SFTP" android:textColor="@color/muted" android:layout_marginBottom="18dp"/>
+
+<LinearLayout android:orientation="horizontal" android:weightSum="2" android:layout_width="match_parent" android:layout_height="150dp">
+<LinearLayout android:orientation="vertical" android:padding="17dp" android:background="@drawable/card" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginEnd="6dp">
+<TextView android:text="INTERNET" android:textColor="@color/primary" android:textStyle="bold"/>
+<TextView android:id="@+id/tvDownload" android:text="-- Mbps" android:textColor="@color/text" android:textSize="25sp" android:textStyle="bold" android:layout_marginTop="14dp"/>
+<TextView android:id="@+id/tvUpload" android:text="↑ -- Mbps" android:textColor="@color/muted"/>
+<TextView android:id="@+id/tvPing" android:text="Ping -- ms" android:textColor="@color/muted"/>
+</LinearLayout>
+<LinearLayout android:orientation="vertical" android:padding="17dp" android:background="@drawable/card" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginStart="6dp">
+<TextView android:text="STATUS" android:textColor="@color/accent" android:textStyle="bold"/>
+<TextView android:id="@+id/tvStatus" android:text="READY" android:textColor="@color/success" android:textSize="25sp" android:textStyle="bold" android:layout_marginTop="14dp"/>
+<TextView android:id="@+id/tvTime" android:text="Not tested" android:textColor="@color/muted"/>
+</LinearLayout></LinearLayout>
+
+<Button android:id="@+id/btnInternet" android:text="TEST INTERNET SPEED" android:layout_width="match_parent" android:layout_height="58dp" android:layout_marginTop="14dp"/>
+<LinearLayout android:orientation="horizontal" android:weightSum="2" android:layout_width="match_parent" android:layout_height="60dp" android:layout_marginTop="10dp">
+<Button android:id="@+id/btnLevel1" android:text="⚡ CHECK LEVEL 1" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginEnd="5dp"/>
+<Button android:id="@+id/btnSftp" android:text="📁 CHECK SFTP" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginStart="5dp"/>
+</LinearLayout>
+
+<LinearLayout android:orientation="vertical" android:padding="17dp" android:background="@drawable/card" android:layout_width="match_parent" android:layout_height="110dp" android:layout_marginTop="12dp">
+<TextView android:text="LEVEL 1 SERVER" android:textColor="@color/primary" android:textStyle="bold"/>
+<TextView android:id="@+id/tvLevel1" android:text="Not checked" android:textColor="@color/text" android:textSize="21sp" android:textStyle="bold"/>
+<TextView android:id="@+id/tvLevel1Detail" android:text="Response time" android:textColor="@color/muted"/>
+</LinearLayout>
+
+<LinearLayout android:orientation="vertical" android:padding="17dp" android:background="@drawable/card" android:layout_width="match_parent" android:layout_height="110dp" android:layout_marginTop="12dp">
+<TextView android:text="SFTP SERVER" android:textColor="@color/accent" android:textStyle="bold"/>
+<TextView android:id="@+id/tvSftp" android:text="Not checked" android:textColor="@color/text" android:textSize="21sp" android:textStyle="bold"/>
+<TextView android:id="@+id/tvSftpDetail" android:text="Connection / transfer speed" android:textColor="@color/muted"/>
+</LinearLayout>
+
+<LinearLayout android:orientation="vertical" android:padding="17dp" android:background="@drawable/card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp">
+<TextView android:text="SERVER DOWN ALERT" android:textColor="@color/danger" android:textStyle="bold"/>
+<EditText android:id="@+id/etEmail" android:hint="Alert email address" android:inputType="textEmailAddress" android:layout_width="match_parent" android:layout_height="55dp"/>
+<LinearLayout android:orientation="horizontal" android:weightSum="2" android:layout_width="match_parent" android:layout_height="55dp">
+<Button android:id="@+id/btnSaveEmail" android:text="SAVE EMAIL" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent"/>
+<Button android:id="@+id/btnSendEmail" android:text="SEND EMAIL" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent"/>
+</LinearLayout>
+<TextView android:id="@+id/tvAlert" android:text="No alert" android:textColor="@color/muted"/>
+</LinearLayout>
+</LinearLayout></ScrollView>
