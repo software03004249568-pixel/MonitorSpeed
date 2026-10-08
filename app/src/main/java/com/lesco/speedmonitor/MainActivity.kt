@@ -1,1588 +1,508 @@
 package com.lesco.speedmonitor
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
-import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import android.widget.*
 import java.io.BufferedInputStream
-import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.URL
 import kotlin.math.max
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : android.app.Activity() {
 
-    // =========================================================
-    // COLORS
-    // =========================================================
-
-    private val bgColor = Color.rgb(10, 15, 25)
-    private val cardColor = Color.rgb(20, 27, 40)
-    private val white = Color.WHITE
-    private val muted = Color.rgb(170, 180, 195)
-    private val primary = Color.rgb(60, 150, 255)
-    private val accent = Color.rgb(45, 210, 140)
-    private val danger = Color.rgb(240, 80, 90)
+    private val bg = Color.rgb(7, 17, 31)
+    private val card = Color.rgb(20, 34, 56)
+    private val text = Color.WHITE
+    private val muted = Color.rgb(158, 175, 197)
+    private val blue = Color.rgb(36, 123, 255)
+    private val green = Color.rgb(55, 214, 160)
+    private val red = Color.rgb(227, 79, 95)
     private val yellow = Color.rgb(245, 190, 60)
 
-    // =========================================================
-    // UI
-    // =========================================================
-
-    private lateinit var d: TextView
-    private lateinit var u: TextView
+    private lateinit var download: TextView
+    private lateinit var upload: TextView
     private lateinit var ping: TextView
-
-    private lateinit var status: TextView
-
+    private lateinit var internetStatus: TextView
     private lateinit var level1Result: TextView
     private lateinit var sftpResult: TextView
-
+    private lateinit var emailInput: EditText
     private lateinit var internetButton: Button
     private lateinit var level1Button: Button
     private lateinit var sftpButton: Button
 
-    private lateinit var emailInput: EditText
+    @Volatile private var internetRunning = false
+    @Volatile private var level1Running = false
+    @Volatile private var sftpRunning = false
 
-    // =========================================================
-    // LIVE TEST FLAGS
-    // =========================================================
-
-    @Volatile
-    private var internetRunning = false
-
-    @Volatile
-    private var level1Running = false
-
-    @Volatile
-    private var sftpRunning = false
-
-    // =========================================================
-    // HANDLER
-    // =========================================================
-
-    private val handler =
-        Handler(Looper.getMainLooper())
-
-    // =========================================================
-    // INTERVAL
-    // =========================================================
-
-    private val testInterval = 1000L
-
-    // =========================================================
-    // ON CREATE
-    // =========================================================
+    private val handler = Handler(Looper.getMainLooper())
+    private val interval = 1000L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        window.statusBarColor = bgColor
-        window.navigationBarColor = bgColor
-
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
         setContentView(buildUi())
-
-        loadSavedEmail()
+        loadEmail()
     }
 
-    // =========================================================
-    // UI
-    // =========================================================
-
     private fun buildUi(): ScrollView {
-
         val scroll = ScrollView(this).apply {
-            setBackgroundColor(bgColor)
+            setBackgroundColor(bg)
             isFillViewport = true
         }
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-
-            setPadding(
-                dp(20),
-                dp(20),
-                dp(20),
-                dp(24)
-            )
+            setPadding(dp(18), dp(18), dp(18), dp(26))
         }
+        scroll.addView(root, ViewGroup.LayoutParams(-1, -2))
 
-        scroll.addView(
-            root,
-            ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        )
-
-        // =====================================================
-        // HEADER
-        // =====================================================
-
-        root.addView(
-            text(
-                "SPEED MONITOR",
-                27f,
-                white,
-                true
-            )
-        )
-
-        root.addView(
-            text(
-                "Internet • Level 1 • SFTP",
-                14f,
-                muted,
-                false
-            ).apply {
-                setPadding(
-                    0,
-                    0,
-                    0,
-                    dp(14)
-                )
-            }
-        )
-
-        // =====================================================
-        // TOP CARDS
-        // =====================================================
-
-        val top = LinearLayout(this).apply {
+        val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
         }
 
-        val internetCard =
-            statCard(
-                "INTERNET",
-                primary
-            )
+        val icon = ImageView(this).apply {
+            setImageResource(com.lesco.speedmonitor.R.drawable.ic_speed)
+        }
+        header.addView(icon, LinearLayout.LayoutParams(dp(58), dp(58)))
 
-        d = internetCard.second[0]
-        u = internetCard.second[1]
-        ping = internetCard.second[2]
+        val titleBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, 0, 0)
+        }
+        titleBox.addView(tv("Speed Monitor", 26f, text, true))
+        titleBox.addView(tv("Live network performance dashboard", 13f, muted, false))
+        header.addView(titleBox, LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(header)
 
-        top.addView(
-            internetCard.first,
-            weightParams(1f, 6)
-        )
+        root.addView(space(16))
 
-        val statusCard =
-            statCard(
-                "STATUS",
-                accent
-            )
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_card)
+        }
 
-        status = statusCard.second[0]
+        hero.addView(tv("INTERNET SPEED", 12f, blue, true))
+        download = tv("-- Mbps", 38f, text, true)
+        hero.addView(download)
+        upload = tv("↑ -- Mbps", 15f, muted, false)
+        hero.addView(upload)
+        ping = tv("Ping -- ms", 14f, muted, false)
+        hero.addView(ping)
+        internetStatus = tv("READY", 13f, green, true)
+        internetStatus.setPadding(0, dp(7), 0, 0)
+        hero.addView(internetStatus)
+        root.addView(hero, LinearLayout.LayoutParams(-1, dp(190)))
 
-        statusCard.second[1].text = "Server"
-        statusCard.second[2].text = "Ready"
+        root.addView(space(12))
 
-        top.addView(
-            statusCard.first,
-            weightParams(1f, 6)
-        )
-
-        root.addView(
-            top,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(150)
-            )
-        )
-
-        // =====================================================
-        // INTERNET BUTTON
-        // =====================================================
-
-        internetButton =
-            button(
-                "TEST INTERNET SPEED",
-                primary
-            )
-
+        internetButton = makeButton("▶  START LIVE SPEED TEST", blue)
         internetButton.setOnClickListener {
-
-            if (internetRunning) {
-                stopInternetTest()
-            } else {
-                startInternetTest()
-            }
+            if (internetRunning) stopInternet() else startInternet()
         }
+        root.addView(internetButton, lp(-1, 54, 0, 0, 0, 14))
 
-        root.addView(
-            internetButton,
-            marginParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(52),
-                0,
-                0,
-                0,
-                18
-            )
-        )
+        root.addView(section("SERVER MONITORING"))
 
-        // =====================================================
-        // LEVEL 1
-        // =====================================================
+        root.addView(serverCard(
+            "LEVEL 1",
+            "usersnap.pitc.com.pk",
+            { level1Result = it },
+            green
+        ))
 
-        root.addView(
-            sectionTitle(
-                "LEVEL 1 SERVER"
-            )
-        )
-
-        val level1Card =
-            LinearLayout(this).apply {
-
-                orientation =
-                    LinearLayout.VERTICAL
-
-                setPadding(
-                    dp(16),
-                    dp(14),
-                    dp(16),
-                    dp(14)
-                )
-
-                background =
-                    rounded(
-                        cardColor,
-                        14
-                    )
-            }
-
-        level1Result =
-            text(
-                "Not tested",
-                16f,
-                muted,
-                false
-            )
-
-        level1Card.addView(
-            level1Result
-        )
-
-        level1Card.addView(
-            text(
-                "usersnap.pitc.com.pk",
-                13f,
-                muted,
-                false
-            ).apply {
-
-                setPadding(
-                    0,
-                    dp(6),
-                    0,
-                    0
-                )
-            }
-        )
-
-        root.addView(
-            level1Card,
-            marginParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                0,
-                0,
-                0,
-                10
-            )
-        )
-
-        level1Button =
-            button(
-                "START LEVEL 1 TEST",
-                accent
-            )
-
+        level1Button = makeButton("START LEVEL 1 MONITOR", green)
         level1Button.setOnClickListener {
-
-            if (level1Running) {
-                stopLevel1Test()
-            } else {
-                startLevel1Test()
-            }
+            if (level1Running) stopLevel1() else startLevel1()
         }
+        root.addView(level1Button, lp(-1, 50, 0, 0, 0, 12))
 
-        root.addView(
-            level1Button,
-            marginParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(50),
-                0,
-                0,
-                0,
-                18
-            )
-        )
+        root.addView(serverCard(
+            "SFTP / FTP",
+            "snaps.pitc.com.pk : 2232",
+            { sftpResult = it },
+            blue
+        ))
 
-        // =====================================================
-        // SFTP
-        // =====================================================
-
-        root.addView(
-            sectionTitle(
-                "SFTP SERVER"
-            )
-        )
-
-        val sftpCard =
-            LinearLayout(this).apply {
-
-                orientation =
-                    LinearLayout.VERTICAL
-
-                setPadding(
-                    dp(16),
-                    dp(14),
-                    dp(16),
-                    dp(14)
-                )
-
-                background =
-                    rounded(
-                        cardColor,
-                        14
-                    )
-            }
-
-        sftpResult =
-            text(
-                "Not tested",
-                16f,
-                muted,
-                false
-            )
-
-        sftpCard.addView(
-            sftpResult
-        )
-
-        sftpCard.addView(
-            text(
-                "snaps.pitc.com.pk : 2232",
-                13f,
-                muted,
-                false
-            ).apply {
-
-                setPadding(
-                    0,
-                    dp(6),
-                    0,
-                    0
-                )
-            }
-        )
-
-        root.addView(
-            sftpCard,
-            marginParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                0,
-                0,
-                0,
-                10
-            )
-        )
-
-        sftpButton =
-            button(
-                "START SFTP TEST",
-                primary
-            )
-
+        sftpButton = makeButton("START SFTP MONITOR", blue)
         sftpButton.setOnClickListener {
+            if (sftpRunning) stopSftp() else startSftp()
+        }
+        root.addView(sftpButton, lp(-1, 50, 0, 0, 0, 16))
 
-            if (sftpRunning) {
-                stopSftpTest()
-            } else {
-                startSftpTest()
-            }
+        root.addView(section("SERVER DOWN ALERT"))
+
+        val emailRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
         }
 
-        root.addView(
-            sftpButton,
-            marginParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(50),
-                0,
-                0,
-                0,
-                18
-            )
-        )
+        emailInput = EditText(this).apply {
+            hint = "Alert email address"
+            setHintTextColor(muted)
+            setTextColor(text)
+            textSize = 15f
+            setSingleLine(true)
+            setPadding(dp(14), 0, dp(14), 0)
+            background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_input)
+        }
+        emailRow.addView(emailInput, LinearLayout.LayoutParams(0, 52.dp(), 1f))
 
-        // =====================================================
-        // EMAIL
-        // =====================================================
+        val save = smallButton("SAVE")
+        save.setOnClickListener { saveEmail() }
+        emailRow.addView(save, LinearLayout.LayoutParams(dp(86), 52.dp()).apply {
+            setMargins(dp(8), 0, 0, 0)
+        })
+        root.addView(emailRow)
 
-        root.addView(
-            sectionTitle(
-                "SERVER DOWN ALERT"
-            )
-        )
+        val send = makeButton("✉  SEND TEST / SERVER ALERT MAIL", green)
+        send.setOnClickListener { sendAlertMail() }
+        root.addView(send, lp(-1, 50, 0, 10, 0, 16))
 
-        emailInput =
-            EditText(this).apply {
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_card)
+        }
+        info.addView(tv("MONITORING", 12f, blue, true))
+        info.addView(tv("• Internet: live download, upload & ping", 13f, muted, false))
+        info.addView(tv("• Level 1: live API response / availability", 13f, muted, false))
+        info.addView(tv("• SFTP: live port connectivity / response", 13f, muted, false))
+        info.addView(tv("• Tests run only while the monitor is ON", 13f, muted, false))
+        root.addView(info)
 
-                hint =
-                    "Enter email address"
-
-                setHintTextColor(
-                    muted
-                )
-
-                setTextColor(
-                    white
-                )
-
-                textSize = 15f
-
-                setSingleLine(true)
-
-                setPadding(
-                    dp(14),
-                    0,
-                    dp(14),
-                    0
-                )
-
-                background =
-                    rounded(
-                        cardColor,
-                        12
-                    )
-            }
-
-        root.addView(
-            emailInput,
-            marginParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(52),
-                0,
-                0,
-                0,
-                10
-            )
-        )
-
-        root.addView(
-            button(
-                "SAVE EMAIL",
-                accent
-            ).apply {
-
-                setOnClickListener {
-                    saveEmail()
-                }
-            },
-            marginParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(50),
-                0,
-                0,
-                0,
-                20
-            )
-        )
-
-        // =====================================================
-        // FOOTER
-        // =====================================================
-
-        root.addView(
-            text(
-                "LESCO IT Directorate",
-                13f,
-                muted,
-                false
-            ).apply {
-
-                gravity =
-                    Gravity.CENTER
-
-                setPadding(
-                    0,
-                    dp(8),
-                    0,
-                    dp(8)
-                )
-            }
-        )
+        root.addView(space(16))
+        root.addView(tv("LESCO IT Directorate  •  Speed Monitor 1.0", 12f, muted, false).apply {
+            gravity = Gravity.CENTER
+        })
 
         return scroll
     }
 
-    // =========================================================
-    // START INTERNET
-    // =========================================================
+    private fun serverCard(
+        title: String,
+        host: String,
+        resultSetter: (TextView) -> Unit,
+        accent: Int
+    ): View {
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_card)
+        }
+        box.addView(tv(title, 13f, accent, true))
+        val result = tv("READY", 18f, muted, true)
+        resultSetter(result)
+        box.addView(result)
+        box.addView(tv(host, 12f, muted, false))
+        return box
+    }
 
-    private fun startInternetTest() {
+    private fun section(s: String): TextView =
+        tv(s, 13f, muted, true).apply { setPadding(dp(2), dp(4), 0, dp(8)) }
 
+    private fun startInternet() {
         internetRunning = true
-
-        internetButton.text =
-            "STOP INTERNET TEST"
-
-        internetButton.setBackgroundColor(
-            danger
-        )
-
-        status.text =
-            "LIVE"
-
-        status.setTextColor(
-            accent
-        )
-
+        internetButton.text = "■  STOP LIVE SPEED TEST"
+        internetButton.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_red)
+        internetStatus.text = "LIVE"
+        internetStatus.setTextColor(green)
         runInternetCycle()
     }
 
-    // =========================================================
-    // STOP INTERNET
-    // =========================================================
-
-    private fun stopInternetTest() {
-
+    private fun stopInternet() {
         internetRunning = false
-
-        internetButton.text =
-            "TEST INTERNET SPEED"
-
-        internetButton.setBackgroundColor(
-            primary
-        )
-
-        status.text =
-            "Stopped"
-
-        status.setTextColor(
-            muted
-        )
+        internetButton.text = "▶  START LIVE SPEED TEST"
+        internetButton.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_button)
+        internetStatus.text = "STOPPED"
+        internetStatus.setTextColor(muted)
     }
 
-    // =========================================================
-    // INTERNET CYCLE
-    // =========================================================
-
     private fun runInternetCycle() {
-
-        if (!internetRunning) {
-            return
-        }
-
+        if (!internetRunning) return
         Thread {
-
-            var pingMs = -1L
-
+            var p = -1L
             try {
-
-                // -------------------------------------------------
-                // PING
-                // -------------------------------------------------
-
-                val pingStart =
-                    System.currentTimeMillis()
-
-                val process =
-                    Runtime.getRuntime().exec(
-                        arrayOf(
-                            "ping",
-                            "-c",
-                            "1",
-                            "-W",
-                            "1",
-                            "8.8.8.8"
-                        )
-                    )
-
+                val ps = System.currentTimeMillis()
+                val process = Runtime.getRuntime().exec(arrayOf("ping", "-c", "1", "-W", "1", "8.8.8.8"))
                 process.waitFor()
+                if (process.exitValue() == 0) p = System.currentTimeMillis() - ps
 
-                if (process.exitValue() == 0) {
-
-                    pingMs =
-                        System.currentTimeMillis() -
-                                pingStart
-                }
-
-                // -------------------------------------------------
-                // DOWNLOAD TEST
-                // -------------------------------------------------
-
-                val downloadMbps =
-                    downloadSpeed()
-
-                // -------------------------------------------------
-                // UPLOAD TEST
-                // -------------------------------------------------
-
-                val uploadMbps =
-                    uploadSpeed()
-
-                // -------------------------------------------------
-                // UPDATE UI
-                // -------------------------------------------------
+                val down = downloadSpeed()
+                val up = uploadSpeed()
 
                 runOnUiThread {
-
-                    if (!internetRunning) {
-                        return@runOnUiThread
-                    }
-
-                    if (pingMs >= 0) {
-
-                        ping.text =
-                            "Ping $pingMs ms"
-
-                        status.text =
-                            "LIVE"
-
-                        status.setTextColor(
-                            accent
-                        )
-
-                    } else {
-
-                        ping.text =
-                            "Ping -- ms"
-
-                        status.text =
-                            "OFFLINE"
-
-                        status.setTextColor(
-                            danger
-                        )
-                    }
-
-                    if (downloadMbps >= 0) {
-
-                        d.text =
-                            String.format(
-                                "%.2f Mbps",
-                                downloadMbps
-                            )
-
-                    } else {
-
-                        d.text =
-                            "-- Mbps"
-                    }
-
-                    if (uploadMbps >= 0) {
-
-                        u.text =
-                            "↑ " +
-                                    String.format(
-                                        "%.2f Mbps",
-                                        uploadMbps
-                                    )
-
-                    } else {
-
-                        u.text =
-                            "↑ -- Mbps"
-                    }
+                    if (!internetRunning) return@runOnUiThread
+                    ping.text = if (p >= 0) "Ping $p ms" else "Ping -- ms"
+                    download.text = if (down >= 0) String.format("%.2f Mbps", down) else "-- Mbps"
+                    upload.text = if (up >= 0) "↑ " + String.format("%.2f Mbps", up) else "↑ -- Mbps"
+                    internetStatus.text = if (p >= 0) "LIVE • ONLINE" else "OFFLINE"
+                    internetStatus.setTextColor(if (p >= 0) green else red)
                 }
-
-            } catch (ex: Exception) {
-
+            } catch (_: Exception) {
                 runOnUiThread {
-
-                    if (!internetRunning) {
-                        return@runOnUiThread
-                    }
-
-                    status.text =
-                        "OFFLINE"
-
-                    status.setTextColor(
-                        danger
-                    )
-
-                    d.text =
-                        "-- Mbps"
-
-                    u.text =
-                        "↑ -- Mbps"
-
-                    ping.text =
-                        "Ping -- ms"
+                    if (!internetRunning) return@runOnUiThread
+                    internetStatus.text = "OFFLINE"
+                    internetStatus.setTextColor(red)
+                    download.text = "-- Mbps"
+                    upload.text = "↑ -- Mbps"
+                    ping.text = "Ping -- ms"
                 }
             }
-
-            handler.postDelayed(
-                {
-                    runInternetCycle()
-                },
-                testInterval
-            )
-
+            handler.postDelayed({ runInternetCycle() }, interval)
         }.start()
     }
 
-    // =========================================================
-    // DOWNLOAD SPEED
-    // =========================================================
-
     private fun downloadSpeed(): Double {
-
-        var connection:
-                HttpURLConnection? = null
-
-        try {
-
-            val url =
-                URL(
-                    "https://speed.cloudflare.com/__down?bytes=262144"
-                )
-
-            connection =
-                url.openConnection()
-                        as HttpURLConnection
-
-            connection.connectTimeout =
-                5000
-
-            connection.readTimeout =
-                5000
-
-            connection.requestMethod =
-                "GET"
-
-            connection.connect()
-
-            val start =
-                System.nanoTime()
-
-            var totalBytes = 0L
-
-            val buffer =
-                ByteArray(16384)
-
-            val input =
-                BufferedInputStream(
-                    connection.inputStream
-                )
-
-            while (true) {
-
-                val count =
-                    input.read(buffer)
-
-                if (count == -1) {
-                    break
-                }
-
-                totalBytes += count
-
-                if (
-                    totalBytes >=
-                    262144L
-                ) {
-                    break
+        var c: HttpURLConnection? = null
+        return try {
+            val u = URL("https://speed.cloudflare.com/__down?bytes=262144")
+            c = u.openConnection() as HttpURLConnection
+            c.connectTimeout = 5000
+            c.readTimeout = 5000
+            c.requestMethod = "GET"
+            c.connect()
+            val start = System.nanoTime()
+            var total = 0L
+            val buffer = ByteArray(16384)
+            BufferedInputStream(c.inputStream).use { input ->
+                while (total < 262144L) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    total += n
                 }
             }
-
-            input.close()
-
-            val elapsed =
-                max(
-                    1L,
-                    System.nanoTime() - start
-                )
-
-            return (
-                totalBytes.toDouble() *
-                        8.0 /
-                        elapsed.toDouble()
-                ) * 1000000000.0 /
-                    1000000.0
-
-        } catch (ex: Exception) {
-
-            return -1.0
-
-        } finally {
-
-            connection?.disconnect()
-        }
+            val ns = max(1L, System.nanoTime() - start)
+            total * 8.0 * 1_000_000_000.0 / ns / 1_000_000.0
+        } catch (_: Exception) { -1.0 }
+        finally { c?.disconnect() }
     }
-
-    // =========================================================
-    // UPLOAD SPEED
-    // =========================================================
 
     private fun uploadSpeed(): Double {
-
-        var connection:
-                HttpURLConnection? = null
-
-        try {
-
-            val size =
-                131072
-
-            val data =
-                ByteArray(size)
-
-            val url =
-                URL(
-                    "https://speed.cloudflare.com/__up"
-                )
-
-            connection =
-                url.openConnection()
-                        as HttpURLConnection
-
-            connection.connectTimeout =
-                5000
-
-            connection.readTimeout =
-                5000
-
-            connection.requestMethod =
-                "POST"
-
-            connection.doOutput =
-                true
-
-            connection.setFixedLengthStreamingMode(
-                size
-            )
-
-            connection.setRequestProperty(
-                "Content-Type",
-                "application/octet-stream"
-            )
-
-            connection.connect()
-
-            val start =
-                System.nanoTime()
-
-            val output:
-                    OutputStream =
-                connection.outputStream
-
-            output.write(data)
-            output.flush()
-            output.close()
-
-            connection.responseCode
-
-            val elapsed =
-                max(
-                    1L,
-                    System.nanoTime() - start
-                )
-
-            return (
-                size.toDouble() *
-                        8.0 /
-                        elapsed.toDouble()
-                ) * 1000000000.0 /
-                    1000000.0
-
-        } catch (ex: Exception) {
-
-            return -1.0
-
-        } finally {
-
-            connection?.disconnect()
-        }
+        var c: HttpURLConnection? = null
+        return try {
+            val data = ByteArray(131072)
+            val u = URL("https://speed.cloudflare.com/__up")
+            c = u.openConnection() as HttpURLConnection
+            c.connectTimeout = 5000
+            c.readTimeout = 5000
+            c.requestMethod = "POST"
+            c.doOutput = true
+            c.setFixedLengthStreamingMode(data.size)
+            c.setRequestProperty("Content-Type", "application/octet-stream")
+            c.connect()
+            val start = System.nanoTime()
+            c.outputStream.use { it.write(data) }
+            c.responseCode
+            val ns = max(1L, System.nanoTime() - start)
+            data.size * 8.0 * 1_000_000_000.0 / ns / 1_000_000.0
+        } catch (_: Exception) { -1.0 }
+        finally { c?.disconnect() }
     }
 
-    // =========================================================
-    // START LEVEL 1
-    // =========================================================
-
-    private fun startLevel1Test() {
-
+    private fun startLevel1() {
         level1Running = true
-
-        level1Button.text =
-            "STOP LEVEL 1 TEST"
-
-        level1Button.setBackgroundColor(
-            danger
-        )
-
-        level1Result.text =
-            "LIVE TEST STARTED..."
-
-        level1Result.setTextColor(
-            primary
-        )
-
+        level1Button.text = "■  STOP LEVEL 1 MONITOR"
+        level1Button.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_red)
+        level1Result.text = "TESTING..."
+        level1Result.setTextColor(yellow)
         runLevel1Cycle()
     }
 
-    // =========================================================
-    // STOP LEVEL 1
-    // =========================================================
-
-    private fun stopLevel1Test() {
-
+    private fun stopLevel1() {
         level1Running = false
-
-        level1Button.text =
-            "START LEVEL 1 TEST"
-
-        level1Button.setBackgroundColor(
-            accent
-        )
-
-        level1Result.text =
-            "Test stopped"
-
-        level1Result.setTextColor(
-            muted
-        )
+        level1Button.text = "START LEVEL 1 MONITOR"
+        level1Button.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_green)
+        level1Result.text = "STOPPED"
+        level1Result.setTextColor(muted)
     }
 
-    // =========================================================
-    // LEVEL 1 CYCLE
-    // =========================================================
-
     private fun runLevel1Cycle() {
-
-        if (!level1Running) {
-            return
-        }
-
+        if (!level1Running) return
         Thread {
-
-            var connection:
-                    HttpURLConnection? = null
-
+            var c: HttpURLConnection? = null
             try {
-
-                val start =
-                    System.currentTimeMillis()
-
-                val url =
-                    URL(
-                        "https://usersnap.pitc.com.pk/api/SnapsForPrinting/ToPrinting"
-                    )
-
-                connection =
-                    url.openConnection()
-                            as HttpURLConnection
-
-                connection.requestMethod =
-                    "POST"
-
-                connection.connectTimeout =
-                    10000
-
-                connection.readTimeout =
-                    10000
-
-                connection.doOutput =
-                    true
-
-                connection.setRequestProperty(
-                    "Content-Type",
-                    "application/json"
-                )
-
-                val json =
-                    """
-                    {
-                        "BATCH":"01",
-                        "DIV":"11164",
-                        "CC_CODE":"1101",
-                        "BILL_MONTH":"01-May-2026",
-                        "PAGE_NUMBER":"1"
-                    }
-                    """.trimIndent()
-
-                connection.outputStream.use {
-
-                    it.write(
-                        json.toByteArray(
-                            Charsets.UTF_8
-                        )
-                    )
-                }
-
-                val responseCode =
-                    connection.responseCode
-
-                val elapsed =
-                    System.currentTimeMillis() -
-                            start
-
+                val start = System.currentTimeMillis()
+                c = URL("https://usersnap.pitc.com.pk/api/SnapsForPrinting/ToPrinting")
+                    .openConnection() as HttpURLConnection
+                c.requestMethod = "POST"
+                c.connectTimeout = 8000
+                c.readTimeout = 8000
+                c.doOutput = true
+                c.setRequestProperty("Content-Type", "application/json")
+                val json = """{"BATCH":"01","DIV":"11164","CC_CODE":"1101","BILL_MONTH":"01-May-2026","PAGE_NUMBER":"1"}"""
+                c.outputStream.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                val code = c.responseCode
+                val ms = System.currentTimeMillis() - start
                 runOnUiThread {
-
-                    if (!level1Running) {
-                        return@runOnUiThread
-                    }
-
-                    if (
-                        responseCode in
-                        200..299
-                    ) {
-
-                        level1Result.text =
-                            "ONLINE • $elapsed ms • HTTP $responseCode"
-
-                        level1Result.setTextColor(
-                            accent
-                        )
-
+                    if (!level1Running) return@runOnUiThread
+                    if (code in 200..299) {
+                        level1Result.text = "ONLINE  •  $ms ms  •  HTTP $code"
+                        level1Result.setTextColor(green)
                     } else {
-
-                        level1Result.text =
-                            "ERROR • HTTP $responseCode • $elapsed ms"
-
-                        level1Result.setTextColor(
-                            danger
-                        )
+                        level1Result.text = "SERVER ERROR  •  HTTP $code  •  $ms ms"
+                        level1Result.setTextColor(red)
                     }
                 }
-
-            } catch (ex: Exception) {
-
+            } catch (_: Exception) {
                 runOnUiThread {
-
-                    if (!level1Running) {
-                        return@runOnUiThread
-                    }
-
-                    level1Result.text =
-                        "OFFLINE / ERROR"
-
-                    level1Result.setTextColor(
-                        danger
-                    )
+                    if (!level1Running) return@runOnUiThread
+                    level1Result.text = "OFFLINE / SERVER ERROR"
+                    level1Result.setTextColor(red)
                 }
-
-            } finally {
-
-                connection?.disconnect()
-            }
-
-            handler.postDelayed(
-                {
-                    runLevel1Cycle()
-                },
-                testInterval
-            )
-
+            } finally { c?.disconnect() }
+            handler.postDelayed({ runLevel1Cycle() }, interval)
         }.start()
     }
 
-    // =========================================================
-    // START SFTP
-    // =========================================================
-
-    private fun startSftpTest() {
-
+    private fun startSftp() {
         sftpRunning = true
-
-        sftpButton.text =
-            "STOP SFTP TEST"
-
-        sftpButton.setBackgroundColor(
-            danger
-        )
-
-        sftpResult.text =
-            "LIVE TEST STARTED..."
-
-        sftpResult.setTextColor(
-            primary
-        )
-
+        sftpButton.text = "■  STOP SFTP MONITOR"
+        sftpButton.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_red)
+        sftpResult.text = "TESTING..."
+        sftpResult.setTextColor(yellow)
         runSftpCycle()
     }
 
-    // =========================================================
-    // STOP SFTP
-    // =========================================================
-
-    private fun stopSftpTest() {
-
+    private fun stopSftp() {
         sftpRunning = false
-
-        sftpButton.text =
-            "START SFTP TEST"
-
-        sftpButton.setBackgroundColor(
-            primary
-        )
-
-        sftpResult.text =
-            "Test stopped"
-
-        sftpResult.setTextColor(
-            muted
-        )
+        sftpButton.text = "START SFTP MONITOR"
+        sftpButton.background = getDrawable(com.lesco.speedmonitor.R.drawable.rounded_button)
+        sftpResult.text = "STOPPED"
+        sftpResult.setTextColor(muted)
     }
 
-    // =========================================================
-    // SFTP CYCLE
-    // =========================================================
-
     private fun runSftpCycle() {
-
-        if (!sftpRunning) {
-            return
-        }
-
+        if (!sftpRunning) return
         Thread {
-
-            var socket:
-                    Socket? = null
-
+            var socket: Socket? = null
             try {
-
-                val start =
-                    System.currentTimeMillis()
-
-                socket =
-                    Socket()
-
-                socket.connect(
-                    InetSocketAddress(
-                        "snaps.pitc.com.pk",
-                        2232
-                    ),
-                    5000
-                )
-
-                val elapsed =
-                    System.currentTimeMillis() -
-                            start
-
+                val start = System.currentTimeMillis()
+                socket = Socket()
+                socket.connect(InetSocketAddress("snaps.pitc.com.pk", 2232), 5000)
+                val ms = System.currentTimeMillis() - start
                 runOnUiThread {
-
-                    if (!sftpRunning) {
-                        return@runOnUiThread
-                    }
-
-                    sftpResult.text =
-                        "ONLINE • $elapsed ms"
-
-                    sftpResult.setTextColor(
-                        accent
-                    )
+                    if (!sftpRunning) return@runOnUiThread
+                    sftpResult.text = "ONLINE  •  $ms ms  •  PORT 2232"
+                    sftpResult.setTextColor(green)
                 }
-
-            } catch (ex: Exception) {
-
+            } catch (_: Exception) {
                 runOnUiThread {
-
-                    if (!sftpRunning) {
-                        return@runOnUiThread
-                    }
-
-                    sftpResult.text =
-                        "OFFLINE / ERROR"
-
-                    sftpResult.setTextColor(
-                        danger
-                    )
+                    if (!sftpRunning) return@runOnUiThread
+                    sftpResult.text = "OFFLINE / CONNECTION ERROR"
+                    sftpResult.setTextColor(red)
                 }
-
             } finally {
-
-                try {
-                    socket?.close()
-                } catch (_: Exception) {
-                }
+                try { socket?.close() } catch (_: Exception) {}
             }
-
-            handler.postDelayed(
-                {
-                    runSftpCycle()
-                },
-                testInterval
-            )
-
+            handler.postDelayed({ runSftpCycle() }, interval)
         }.start()
     }
 
-    // =========================================================
-    // SAVE EMAIL
-    // =========================================================
-
     private fun saveEmail() {
+        val email = emailInput.text.toString().trim()
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            Toast.makeText(this, "Enter a valid email address", Toast.LENGTH_SHORT).show()
+            return
+        }
+        getSharedPreferences("SpeedMonitor", MODE_PRIVATE).edit()
+            .putString("alert_email", email).apply()
+        Toast.makeText(this, "Email saved", Toast.LENGTH_SHORT).show()
+    }
 
-        val email =
-            emailInput.text
-                .toString()
-                .trim()
+    private fun loadEmail() {
+        val email = getSharedPreferences("SpeedMonitor", MODE_PRIVATE)
+            .getString("alert_email", "") ?: ""
+        emailInput.setText(email)
+    }
 
-        if (email.isEmpty()) {
-
-            Toast.makeText(
-                this,
-                "Please enter email address",
-                Toast.LENGTH_SHORT
-            ).show()
-
+    private fun sendAlertMail() {
+        val email = emailInput.text.toString().trim()
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            Toast.makeText(this, "Enter and save a valid email first", Toast.LENGTH_SHORT).show()
             return
         }
 
-        if (
-            !android.util.Patterns.EMAIL_ADDRESS
-                .matcher(email)
-                .matches()
-        ) {
-
-            Toast.makeText(
-                this,
-                "Invalid email address",
-                Toast.LENGTH_SHORT
-            ).show()
-
-            return
+        val subject = "Speed Monitor - Server Alert"
+        val body = buildString {
+            append("Speed Monitor Server Alert\n\n")
+            append("Please check the network/server status.\n\n")
+            append("This message was generated from LESCO Speed Monitor.\n")
         }
 
-        getSharedPreferences(
-            "SpeedMonitor",
-            MODE_PRIVATE
-        )
-            .edit()
-            .putString(
-                "alert_email",
-                email
-            )
-            .apply()
+        val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = Uri.parse("mailto:$email")
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, body)
+        }
 
-        Toast.makeText(
-            this,
-            "Email saved successfully",
-            Toast.LENGTH_SHORT
-        ).show()
-    }
-
-    // =========================================================
-    // LOAD EMAIL
-    // =========================================================
-
-    private fun loadSavedEmail() {
-
-        val savedEmail =
-            getSharedPreferences(
-                "SpeedMonitor",
-                MODE_PRIVATE
-            )
-                .getString(
-                    "alert_email",
-                    ""
-                )
-
-        if (!savedEmail.isNullOrEmpty()) {
-
-            emailInput.setText(
-                savedEmail
-            )
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(this, "No email application is available", Toast.LENGTH_LONG).show()
         }
     }
 
-    // =========================================================
-    // SECTION TITLE
-    // =========================================================
-
-    private fun sectionTitle(
-        value: String
-    ): TextView {
-
-        return text(
-            value,
-            15f,
-            white,
-            true
-        ).apply {
-
-            setPadding(
-                dp(2),
-                dp(2),
-                dp(2),
-                dp(8)
-            )
-        }
-    }
-
-    // =========================================================
-    // STAT CARD
-    // =========================================================
-
-    private fun statCard(
-        title: String,
-        titleColor: Int
-    ): Pair<LinearLayout, Array<TextView>> {
-
-        val card =
-            LinearLayout(this).apply {
-
-                orientation =
-                    LinearLayout.VERTICAL
-
-                setPadding(
-                    dp(17),
-                    dp(15),
-                    dp(17),
-                    dp(12)
-                )
-
-                background =
-                    rounded(
-                        cardColor,
-                        14
-                    )
-            }
-
-        val titleText =
-            text(
-                title,
-                13f,
-                titleColor,
-                true
-            )
-
-        val value =
-            text(
-                "-- Mbps",
-                25f,
-                white,
-                true
-            )
-
-        val upload =
-            text(
-                "↑ -- Mbps",
-                14f,
-                muted,
-                false
-            )
-
-        val latency =
-            text(
-                "Ping -- ms",
-                14f,
-                muted,
-                false
-            )
-
-        card.addView(
-            titleText
-        )
-
-        card.addView(
-            value,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(40)
-            )
-        )
-
-        card.addView(
-            upload
-        )
-
-        card.addView(
-            latency
-        )
-
-        return Pair(
-            card,
-            arrayOf(
-                value,
-                upload,
-                latency
-            )
-        )
-    }
-
-    // =========================================================
-    // BUTTON
-    // =========================================================
-
-    private fun button(
-        value: String,
-        color: Int
-    ): Button {
-
-        return Button(this).apply {
-
-            text = value
-
-            textSize = 14f
-
-            setTextColor(
-                white
-            )
-
-            typeface =
-                Typeface.DEFAULT_BOLD
-
+    private fun makeButton(label: String, color: Int): Button =
+        Button(this).apply {
+            text = label
+            textSize = 13f
+            setTextColor(text)
+            typeface = Typeface.DEFAULT_BOLD
             isAllCaps = false
-
-            background =
-                rounded(
-                    color,
-                    12
-                )
-
-            elevation =
-                dp(2).toFloat()
-        }
-    }
-
-    // =========================================================
-    // TEXT
-    // =========================================================
-
-    private fun text(
-        value: String,
-        size: Float,
-        color: Int,
-        bold: Boolean
-    ): TextView {
-
-        return TextView(this).apply {
-
-            text = value
-
-            textSize = size
-
-            setTextColor(
-                color
-            )
-
-            typeface =
-                if (bold) {
-                    Typeface.DEFAULT_BOLD
-                } else {
-                    Typeface.DEFAULT
+            background = getDrawable(
+                when (color) {
+                    green -> com.lesco.speedmonitor.R.drawable.rounded_green
+                    red -> com.lesco.speedmonitor.R.drawable.rounded_red
+                    else -> com.lesco.speedmonitor.R.drawable.rounded_button
                 }
-        }
-    }
-
-    // =========================================================
-    // ROUNDED BACKGROUND
-    // =========================================================
-
-    private fun rounded(
-        color: Int,
-        radius: Int
-    ): android.graphics.drawable.GradientDrawable {
-
-        return android.graphics.drawable
-            .GradientDrawable()
-            .apply {
-
-                setColor(
-                    color
-                )
-
-                cornerRadius =
-                    dp(radius).toFloat()
-            }
-    }
-
-    // =========================================================
-    // WEIGHT PARAMS
-    // =========================================================
-
-    private fun weightParams(
-        weight: Float,
-        margin: Int
-    ): LinearLayout.LayoutParams {
-
-        return LinearLayout.LayoutParams(
-            0,
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            weight
-        ).apply {
-
-            setMargins(
-                dp(margin),
-                0,
-                dp(margin),
-                0
             )
+            elevation = dp(3).toFloat()
         }
-    }
 
-    // =========================================================
-    // MARGIN PARAMS
-    // =========================================================
+    private fun smallButton(label: String): Button =
+        makeButton(label, blue).apply { textSize = 12f }
 
-    private fun marginParams(
-        width: Int,
-        height: Int,
-        left: Int,
-        top: Int,
-        right: Int,
-        bottom: Int
-    ): LinearLayout.LayoutParams {
-
-        return LinearLayout.LayoutParams(
-            width,
-            height
-        ).apply {
-
-            setMargins(
-                dp(left),
-                dp(top),
-                dp(right),
-                dp(bottom)
-            )
+    private fun tv(s: String, size: Float, color: Int, bold: Boolean): TextView =
+        TextView(this).apply {
+            text = s
+            textSize = size
+            setTextColor(color)
+            typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         }
+
+    private fun space(h: Int): View = Space(this).apply {
+        layoutParams = LinearLayout.LayoutParams(1, dp(h))
     }
 
-    // =========================================================
-    // DP
-    // =========================================================
+    private fun lp(w: Int, h: Int, l: Int, t: Int, r: Int, b: Int): LinearLayout.LayoutParams =
+        LinearLayout.LayoutParams(w, dp(h)).apply {
+            setMargins(dp(l), dp(t), dp(r), dp(b))
+        }
 
-    private fun dp(
-        value: Int
-    ): Int {
+    private fun dp(v: Int): Int =
+        (v * resources.displayMetrics.density).toInt()
 
-        return (
-            value *
-                    resources.displayMetrics.density
-            ).toInt()
-    }
-
-    // =========================================================
-    // CLEANUP
-    // =========================================================
+    private fun Int.dp(): Int = dp(this)
 
     override fun onDestroy() {
-
         internetRunning = false
         level1Running = false
         sftpRunning = false
-
-        handler.removeCallbacksAndMessages(
-            null
-        )
-
+        handler.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
 }
