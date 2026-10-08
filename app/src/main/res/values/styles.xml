@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
+    <!-- Main application theme -->
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
@@ -8,4 +10,17 @@
         <item name="android:windowBackground">#07111F</item>
         <item name="android:colorAccent">#37D6A0</item>
     </style>
+
+    <!-- Compatibility alias: prevents old/stale Material3 references
+         from breaking Android resource linking. No Material3 library is used. -->
+    <style name="Theme.Material3.Dark.NoActionBar"
+        parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#07111F</item>
+        <item name="android:navigationBarColor">#07111F</item>
+        <item name="android:windowBackground">#07111F</item>
+        <item name="android:colorAccent">#37D6A0</item>
+    </style>
+
 </resources>
