@@ -1,16 +1,22 @@
-# Speed Monitor Android
+# Speed Monitor — LESCO IT Directorate
 
-Professional foundation for Internet, Level 1 and SFTP monitoring.
+Android Studio project (Kotlin, JDK 17, compileSdk 35, applicationId `com.lesco.speedmonitor`).
 
-### Included
-- Modern dark dashboard
-- Level 1 POST/status/response timing based on supplied VB.NET logic
-- SFTP test module placeholder
-- Saved alert email
-- Email compose alert
-- Modular structure ready for real bandwidth and SFTP transfer tests
+## Features
+- Live Internet download/upload/ping test, started from its button.
+- Manual Level-1 API and SFTP port checks.
+- Complaint email draft with a PIDC support-team complaint subject and generated status details.
+- Save a WhatsApp number locally; open WhatsApp with a prefilled complaint. The user reviews and presses Send.
+- Background service starts when the dashboard opens, checks Level-1 and SFTP every 15 seconds, and raises a sound/vibration notification when a server changes to down or recovers.
+- Stop Background Monitoring button stops the service.
+- GitHub Actions builds a debug APK on push to `main` or manual workflow dispatch.
 
-### Important
-A ping/HTTP response is NOT an actual Mbps measurement. The final Internet test must use controlled payloads and calculate bytes/time. The SFTP test should similarly use a controlled test file and calculate bytes/time.
+## Important behavior/limitations
+- Android does not allow an ordinary app to silently send an email through the user's email account without authenticated mail delivery. The email button opens the installed email composer with the complaint prefilled; the user must press Send. Direct automatic email requires a properly authenticated backend/SMTP or email API integration. Do not put SMTP passwords in the APK.
+- WhatsApp opens with the complaint prefilled; the user must press Send.
+- Background service is user-visible via an ongoing notification. Android/OEM battery restrictions may still stop background work; allow notifications and, if required by the phone, allow unrestricted battery use for Speed Monitor.
+- The SFTP check verifies TCP port 2232 availability/response only; it does not authenticate or measure SFTP file transfer speed.
+- Monitoring calls the Level-1 endpoint using the existing sample request values. Confirm those request parameters remain valid for the target environment.
 
-Open in Android Studio and build the APK.
+## Build
+Open this folder in Android Studio and build `app` > `assembleDebug`, or push to GitHub `main` and download the `Speed-Monitor-APK` artifact from Actions.

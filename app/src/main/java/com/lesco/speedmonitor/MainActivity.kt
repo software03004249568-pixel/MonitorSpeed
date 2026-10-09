@@ -37,6 +37,8 @@ class MainActivity : Activity() {
     private lateinit var level1Result: TextView
     private lateinit var sftpResult: TextView
     private lateinit var emailInput: EditText
+    private lateinit var phoneInput: EditText
+    private lateinit var backgroundButton: Button
     private lateinit var internetButton: Button
     private lateinit var level1Button: Button
     private lateinit var sftpButton: Button
@@ -54,6 +56,18 @@ class MainActivity : Activity() {
         window.navigationBarColor = bg
         setContentView(buildUi())
         loadEmail()
+        loadPhone()
+        requestNotificationPermission()
+        // Start monitoring automatically when the dashboard opens.
+        if (!getSharedPreferences("SpeedMonitor", MODE_PRIVATE).getBoolean("background_monitor", false)) {
+            val serviceIntent = Intent(this, MonitoringService::class.java)
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent) else startService(serviceIntent)
+                getSharedPreferences("SpeedMonitor", MODE_PRIVATE).edit().putBoolean("background_monitor", true).apply()
+            } catch (_: Exception) { }
+        }
+        backgroundButton.text = "■  STOP BACKGROUND MONITORING"
+        backgroundButton.background = getDrawable(R.drawable.red)
     }
 
     private fun buildUi(): ScrollView {
@@ -161,9 +175,37 @@ class MainActivity : Activity() {
 
         root.addView(emailRow)
 
-        val send = makeButton("✉  SEND ALERT EMAIL", green)
-        send.setOnClickListener { sendAlertMail("Manual server alert test") }
-        root.addView(send, lp(-1, 50, 0, 10, 0, 16))
+        val send = makeButton("✉  COMPOSE COMPLAINT EMAIL", green)
+        send.setOnClickListener { sendAlertMail("Manual complaint") }
+        root.addView(send, lp(-1, 50, 0, 10, 0, 10))
+
+        val phoneRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        phoneInput = EditText(this).apply {
+            hint = "WhatsApp number (e.g. +923001234567)"
+            setHintTextColor(muted)
+            setTextColor(white)
+            textSize = 14f
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_PHONE
+            setPadding(dp(14), 0, dp(14), 0)
+            background = getDrawable(R.drawable.input)
+        }
+        phoneRow.addView(phoneInput, LinearLayout.LayoutParams(0, dp(52), 1f))
+        val savePhone = makeButton("SAVE", blue).apply { textSize = 12f }
+        phoneRow.addView(savePhone, LinearLayout.LayoutParams(dp(88), dp(52)).apply { setMargins(dp(8), 0, 0, 0) })
+        savePhone.setOnClickListener { savePhone() }
+        root.addView(phoneRow, lp(-1, 52, 0, 0, 0, 8))
+
+        val whatsapp = makeButton("◉  SEND COMPLAINT ON WHATSAPP", green)
+        whatsapp.setOnClickListener { openWhatsAppComplaint() }
+        root.addView(whatsapp, lp(-1, 50, 0, 0, 0, 10))
+
+        backgroundButton = makeButton("▶  START BACKGROUND MONITORING", blue)
+        backgroundButton.setOnClickListener { toggleBackgroundMonitoring() }
+        root.addView(backgroundButton, lp(-1, 52, 0, 0, 0, 16))
 
         val info = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -174,7 +216,9 @@ class MainActivity : Activity() {
         info.addView(tv("• Internet: live Download / Upload / Ping", 13f, muted, false))
         info.addView(tv("• Level 1: live API response time", 13f, muted, false))
         info.addView(tv("• SFTP: live port response time", 13f, muted, false))
-        info.addView(tv("• Monitoring runs only after START", 13f, muted, false))
+        info.addView(tv("• Manual tests run only after START", 13f, muted, false))
+        info.addView(tv("• Background monitoring alerts when Level 1 / SFTP goes down", 13f, muted, false))
+        info.addView(tv("• WhatsApp opens with complaint text; you press Send", 13f, muted, false))
         root.addView(info)
 
         root.addView(space(16))
@@ -426,18 +470,9 @@ class MainActivity : Activity() {
             return
         }
 
-        val subject = "Speed Monitor Alert"
-        val body = """
-            Speed Monitor Alert
-
-            Status: $reason
-
-            Internet: ${internetState.text}
-            Level 1: ${level1Result.text}
-            SFTP: ${sftpResult.text}
-
-            Speed Monitor - LESCO IT Directorate
-        """.trimIndent()
+        val subject = if (level1Result.text.toString().contains("OFFLINE", true) || level1Result.text.toString().contains("ERROR", true))
+            "Complaint: Level-1 Server Not Responding" else "Complaint: LESCO Server Connectivity Issue"
+        val body = complaintBody(reason)
 
         val intent = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("mailto:$email")
@@ -449,6 +484,88 @@ class MainActivity : Activity() {
             startActivity(intent)
         } catch (_: Exception) {
             Toast.makeText(this, "No email application is available", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun complaintBody(reason: String): String {
+        val levelDown = level1Result.text.toString().contains("OFFLINE", true) || level1Result.text.toString().contains("ERROR", true)
+        val sftpDown = sftpResult.text.toString().contains("OFFLINE", true) || sftpResult.text.toString().contains("ERROR", true)
+        val issue = when {
+            levelDown && sftpDown -> "Level-1 application server and SFTP server are not responding from the monitoring agent."
+            levelDown -> "The Level-1 application server is not responding from the monitoring agent."
+            sftpDown -> "The SFTP server (snaps.pitc.com.pk:2232) is not responding from the monitoring agent."
+            else -> "A connectivity/performance issue has been observed. Please verify the current server status."
+        }
+        return """Dear PIDC Support Team,
+
+COMPLAINT: SERVER NOT RESPONDING
+
+This is to report a server connectivity issue detected by LESCO IT Directorate's Speed Monitor.
+
+Issue: $issue
+
+Current Status:
+• Level-1: ${level1Result.text}
+• SFTP: ${sftpResult.text}
+• Internet: ${internetState.text}
+
+Kindly investigate the issue and restore the service at the earliest. Please share an update after resolution.
+
+Regards,
+LESCO IT Directorate
+Speed Monitor
+
+Reference: $reason""".trimIndent()
+    }
+
+    private fun savePhone() {
+        val phone = phoneInput.text.toString().trim().replace(" ", "")
+        if (phone.length < 8) {
+            Toast.makeText(this, "Enter a valid WhatsApp number with country code", Toast.LENGTH_SHORT).show()
+            return
+        }
+        getSharedPreferences("SpeedMonitor", MODE_PRIVATE).edit().putString("alert_phone", phone).apply()
+        Toast.makeText(this, "WhatsApp number saved", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun loadPhone() {
+        phoneInput.setText(getSharedPreferences("SpeedMonitor", MODE_PRIVATE).getString("alert_phone", "") ?: "")
+    }
+
+    private fun openWhatsAppComplaint() {
+        val phone = phoneInput.text.toString().trim().replace("+", "").replace(" ", "").replace("-", "")
+        if (phone.length < 8) {
+            Toast.makeText(this, "Save a valid WhatsApp number with country code first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        getSharedPreferences("SpeedMonitor", MODE_PRIVATE).edit().putString("alert_phone", phoneInput.text.toString().trim()).apply()
+        val uri = Uri.parse("https://wa.me/$phone?text=" + Uri.encode(complaintBody("Manual WhatsApp complaint")))
+        try { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+        catch (_: Exception) { Toast.makeText(this, "WhatsApp is not available", Toast.LENGTH_LONG).show() }
+    }
+
+    private fun toggleBackgroundMonitoring() {
+        val intent = Intent(this, MonitoringService::class.java)
+        if (getSharedPreferences("SpeedMonitor", MODE_PRIVATE).getBoolean("background_monitor", false)) {
+            stopService(intent)
+            getSharedPreferences("SpeedMonitor", MODE_PRIVATE).edit().putBoolean("background_monitor", false).apply()
+            backgroundButton.text = "▶  START BACKGROUND MONITORING"
+            backgroundButton.background = getDrawable(R.drawable.blue)
+            Toast.makeText(this, "Background monitoring stopped", Toast.LENGTH_SHORT).show()
+        } else {
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+                getSharedPreferences("SpeedMonitor", MODE_PRIVATE).edit().putBoolean("background_monitor", true).apply()
+                backgroundButton.text = "■  STOP BACKGROUND MONITORING"
+                backgroundButton.background = getDrawable(R.drawable.red)
+                Toast.makeText(this, "Background monitoring started", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) { Toast.makeText(this, "Could not start monitoring. Allow notifications and try again.", Toast.LENGTH_LONG).show() }
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 510)
         }
     }
 
