@@ -250,8 +250,9 @@ class MainActivity : Activity() {
     private fun startInternet() {
         internetRunning = true
         internetButton.text = "■  STOP LIVE SPEED TEST"
-        internetButton.background = getDrawable(R.drawable.red)
-        internetState.text = "LIVE"
+        // Blue while checking; only show red if the connection test fails.
+        internetButton.background = getDrawable(R.drawable.blue)
+        internetState.text = "CHECKING CONNECTION..."
         internetState.setTextColor(green)
         runInternetCycle()
     }
@@ -282,14 +283,19 @@ class MainActivity : Activity() {
                     ping.text = if (pingMs >= 0) "Ping $pingMs ms" else "Ping -- ms"
                     download.text = if (down >= 0) String.format("%.2f Mbps", down) else "-- Mbps"
                     upload.text = if (up >= 0) "↑ " + String.format("%.2f Mbps", up) else "↑ -- Mbps"
-                    internetState.text = if (pingMs >= 0) "LIVE • ONLINE" else "OFFLINE"
-                    internetState.setTextColor(if (pingMs >= 0) green else red)
+                    val internetOnline = pingMs >= 0 || down >= 0.0 || up >= 0.0
+                    internetState.text = if (internetOnline) "LIVE • ONLINE" else "OFFLINE"
+                    internetState.setTextColor(if (internetOnline) green else red)
+                    internetButton.background = getDrawable(
+                        if (internetOnline) R.drawable.green else R.drawable.red
+                    )
                 }
             } catch (_: Exception) {
                 runOnUiThread {
                     if (!internetRunning) return@runOnUiThread
                     internetState.text = "OFFLINE"
                     internetState.setTextColor(red)
+                    internetButton.background = getDrawable(R.drawable.red)
                     download.text = "-- Mbps"
                     upload.text = "↑ -- Mbps"
                     ping.text = "Ping -- ms"
@@ -470,6 +476,45 @@ class MainActivity : Activity() {
         )
     }
 
+    private fun serverOutage(): Pair<String, String>? {
+        val levelText = level1Result.text.toString()
+        val sftpText = sftpResult.text.toString()
+        val levelDown = levelText.contains("OFFLINE", true) ||
+                levelText.contains("NOT RESPONDING", true) ||
+                levelText.contains("ERROR", true)
+        val sftpDown = sftpText.contains("OFFLINE", true) ||
+                sftpText.contains("NOT RESPONDING", true) ||
+                sftpText.contains("ERROR", true)
+
+        if (!levelDown && !sftpDown) return null
+
+        val subject = when {
+            levelDown && sftpDown -> "🚨 Urgent Alert: LESCO Level-1 and FTP Servers Not Responding"
+            levelDown -> "🚨 Urgent Alert: LESCO Level-1 Server Not Responding"
+            else -> "🚨 Urgent Alert: LESCO FTP Server Not Responding"
+        }
+        val issue = when {
+            levelDown && sftpDown -> "• Level-1 server (usersnap.pitc.com.pk) and FTP server (snaps.pitc.com.pk:2232) are OFFLINE / NOT RESPONDING."
+            levelDown -> "• Level-1 server (usersnap.pitc.com.pk) is OFFLINE / NOT RESPONDING."
+            else -> "• FTP server (snaps.pitc.com.pk:2232) is OFFLINE / NOT RESPONDING."
+        }
+        val body = """Dear PITC Support Team,
+
+Our monitoring team has detected the following server issue:
+
+$issue
+
+Kindly investigate the issue and restore the service as soon as possible to ensure uninterrupted LESCO operations.
+Please take immediate action and confirm once the service is restored.
+
+Thank you for your prompt support.
+
+Regards,
+IT Directorate
+LESCO"""
+        return subject to body
+    }
+
     private fun sendAlertMail(reason: String) {
         val email = emailInput.text.toString().trim()
         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
@@ -477,14 +522,18 @@ class MainActivity : Activity() {
             return
         }
 
-        val subject = if (level1Result.text.toString().contains("OFFLINE", true) || level1Result.text.toString().contains("ERROR", true))
-            "Complaint: Level-1 Server Not Responding" else "Complaint: LESCO Server Connectivity Issue"
-        val body = complaintBody(reason)
+        val complaint = serverOutage()
+        if (complaint == null) {
+            Toast.makeText(this, "Both servers appear online. No complaint is required.", Toast.LENGTH_LONG).show()
+            return
+        }
 
+        // Use a standard mailto intent and EXTRA_EMAIL; this helps email apps populate the body.
         val intent = Intent(Intent.ACTION_SENDTO).apply {
-            data = Uri.parse("mailto:$email")
-            putExtra(Intent.EXTRA_SUBJECT, subject)
-            putExtra(Intent.EXTRA_TEXT, body)
+            data = Uri.parse("mailto:")
+            putExtra(Intent.EXTRA_EMAIL, arrayOf(email))
+            putExtra(Intent.EXTRA_SUBJECT, complaint.first)
+            putExtra(Intent.EXTRA_TEXT, complaint.second)
         }
 
         try {
@@ -495,66 +544,7 @@ class MainActivity : Activity() {
     }
 
     private fun complaintBody(reason: String): String {
-        val levelText = level1Result.text.toString()
-        val sftpText = sftpResult.text.toString()
-        val levelDown = levelText.contains("OFFLINE", true) || levelText.contains("ERROR", true)
-        val sftpDown = sftpText.contains("OFFLINE", true) || sftpText.contains("ERROR", true)
-
-        val subject = when {
-            levelDown && sftpDown -> "🚨 Urgent Alert: LESCO Level-1 and SFTP Servers Not Responding"
-            levelDown -> "🚨 Urgent Alert: LESCO Level-1 Server Not Responding"
-            sftpDown -> "🚨 Urgent Alert: LESCO SFTP Server Not Responding"
-            else -> "LESCO Server Status Update"
-        }
-        val issues = buildString {
-            if (levelDown) appendLine("• Level-1 server (usersnap.pitc.com.pk) is OFFLINE / NOT RESPONDING.")
-            if (sftpDown) appendLine("• SFTP server (snaps.pitc.com.pk:2232) is OFFLINE / NOT RESPONDING.")
-        }.trim()
-
-        return if (issues.isNotBlank()) {
-            """$subject
-
-Dear PITC Support Team,
-
-Our monitoring team has detected the following server issue:
-
-$issues
-
-Kindly investigate the issue and restore the service as soon as possible to ensure uninterrupted LESCO operations.
-Please take immediate action and confirm once the service is restored.
-
-Reported By: LESCO IT Directorate
-
-Thank you for your prompt support.
-
-Regards,
-IT Directorate
-LESCO
-
-Current Status:
-• Level-1: $levelText
-• SFTP: $sftpText
-• Internet: ${internetState.text}
-
-Reference: $reason""".trimIndent()
-        } else {
-            """LESCO Server Status Update
-
-Dear PITC Support Team,
-
-Speed Monitor currently reports both monitored servers as responding.
-
-• Level-1: $levelText
-• SFTP: $sftpText
-
-This is a status update, not an outage complaint.
-
-Reported By: LESCO IT Directorate
-
-Regards,
-IT Directorate
-LESCO""".trimIndent()
-        }
+        return serverOutage()?.second ?: "No server outage detected."
     }
 
     private fun savePhone() {
@@ -578,7 +568,13 @@ LESCO""".trimIndent()
             return
         }
         getSharedPreferences("SpeedMonitor", MODE_PRIVATE).edit().putString("alert_phone", phoneInput.text.toString().trim()).apply()
-        val uri = Uri.parse("https://wa.me/$phone?text=" + Uri.encode(complaintBody("Manual WhatsApp complaint")))
+        val complaint = serverOutage()
+        if (complaint == null) {
+            Toast.makeText(this, "Both servers appear online. No complaint is required.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val message = complaint.first + "\n\n" + complaint.second
+        val uri = Uri.parse("https://wa.me/$phone?text=" + Uri.encode(message))
         try { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
         catch (_: Exception) { Toast.makeText(this, "WhatsApp is not available", Toast.LENGTH_LONG).show() }
     }
