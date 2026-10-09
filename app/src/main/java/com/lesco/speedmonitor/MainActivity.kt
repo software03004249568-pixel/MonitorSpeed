@@ -347,7 +347,8 @@ class MainActivity : Activity() {
     private fun startLevel1() {
         level1Running = true
         level1Button.text = "■  STOP LEVEL 1 MONITOR"
-        level1Button.background = getDrawable(R.drawable.red)
+        // Keep the normal healthy color while monitoring; red is reserved for errors.
+        level1Button.background = getDrawable(R.drawable.green)
         level1Result.text = "TESTING..."
         level1Result.setTextColor(yellow)
         runLevel1Cycle()
@@ -383,9 +384,11 @@ class MainActivity : Activity() {
                     if (code in 200..299) {
                         level1Result.text = "ONLINE  •  $ms ms  •  HTTP $code"
                         level1Result.setTextColor(green)
+                        level1Button.background = getDrawable(R.drawable.green)
                     } else {
                         level1Result.text = "SERVER ERROR  •  HTTP $code  •  $ms ms"
                         level1Result.setTextColor(red)
+                        level1Button.background = getDrawable(R.drawable.red)
                     }
                 }
             } catch (_: Exception) {
@@ -393,6 +396,7 @@ class MainActivity : Activity() {
                     if (!level1Running) return@runOnUiThread
                     level1Result.text = "OFFLINE / SERVER ERROR"
                     level1Result.setTextColor(red)
+                    level1Button.background = getDrawable(R.drawable.red)
                 }
             } finally {
                 c?.disconnect()
@@ -404,7 +408,8 @@ class MainActivity : Activity() {
     private fun startSftp() {
         sftpRunning = true
         sftpButton.text = "■  STOP SFTP MONITOR"
-        sftpButton.background = getDrawable(R.drawable.red)
+        // Blue while checking; red only when the SFTP port is unreachable.
+        sftpButton.background = getDrawable(R.drawable.blue)
         sftpResult.text = "TESTING..."
         sftpResult.setTextColor(yellow)
         runSftpCycle()
@@ -431,12 +436,14 @@ class MainActivity : Activity() {
                     if (!sftpRunning) return@runOnUiThread
                     sftpResult.text = "ONLINE  •  $ms ms  •  PORT 2232"
                     sftpResult.setTextColor(green)
+                    sftpButton.background = getDrawable(R.drawable.blue)
                 }
             } catch (_: Exception) {
                 runOnUiThread {
                     if (!sftpRunning) return@runOnUiThread
                     sftpResult.text = "OFFLINE / CONNECTION ERROR"
                     sftpResult.setTextColor(red)
+                    sftpButton.background = getDrawable(R.drawable.red)
                 }
             } finally {
                 try { socket?.close() } catch (_: Exception) {}
@@ -488,34 +495,66 @@ class MainActivity : Activity() {
     }
 
     private fun complaintBody(reason: String): String {
-        val levelDown = level1Result.text.toString().contains("OFFLINE", true) || level1Result.text.toString().contains("ERROR", true)
-        val sftpDown = sftpResult.text.toString().contains("OFFLINE", true) || sftpResult.text.toString().contains("ERROR", true)
-        val issue = when {
-            levelDown && sftpDown -> "Level-1 application server and SFTP server are not responding from the monitoring agent."
-            levelDown -> "The Level-1 application server is not responding from the monitoring agent."
-            sftpDown -> "The SFTP server (snaps.pitc.com.pk:2232) is not responding from the monitoring agent."
-            else -> "A connectivity/performance issue has been observed. Please verify the current server status."
+        val levelText = level1Result.text.toString()
+        val sftpText = sftpResult.text.toString()
+        val levelDown = levelText.contains("OFFLINE", true) || levelText.contains("ERROR", true)
+        val sftpDown = sftpText.contains("OFFLINE", true) || sftpText.contains("ERROR", true)
+
+        val subject = when {
+            levelDown && sftpDown -> "🚨 Urgent Alert: LESCO Level-1 and SFTP Servers Not Responding"
+            levelDown -> "🚨 Urgent Alert: LESCO Level-1 Server Not Responding"
+            sftpDown -> "🚨 Urgent Alert: LESCO SFTP Server Not Responding"
+            else -> "LESCO Server Status Update"
         }
-        return """Dear PIDC Support Team,
+        val issues = buildString {
+            if (levelDown) appendLine("• Level-1 server (usersnap.pitc.com.pk) is OFFLINE / NOT RESPONDING.")
+            if (sftpDown) appendLine("• SFTP server (snaps.pitc.com.pk:2232) is OFFLINE / NOT RESPONDING.")
+        }.trim()
 
-COMPLAINT: SERVER NOT RESPONDING
+        return if (issues.isNotBlank()) {
+            """$subject
 
-This is to report a server connectivity issue detected by LESCO IT Directorate's Speed Monitor.
+Dear PITC Support Team,
 
-Issue: $issue
+Our monitoring team has detected the following server issue:
 
-Current Status:
-• Level-1: ${level1Result.text}
-• SFTP: ${sftpResult.text}
-• Internet: ${internetState.text}
+$issues
 
-Kindly investigate the issue and restore the service at the earliest. Please share an update after resolution.
+Kindly investigate the issue and restore the service as soon as possible to ensure uninterrupted LESCO operations.
+Please take immediate action and confirm once the service is restored.
+
+Reported By: LESCO IT Directorate
+
+Thank you for your prompt support.
 
 Regards,
-LESCO IT Directorate
-Speed Monitor
+IT Directorate
+LESCO
+
+Current Status:
+• Level-1: $levelText
+• SFTP: $sftpText
+• Internet: ${internetState.text}
 
 Reference: $reason""".trimIndent()
+        } else {
+            """LESCO Server Status Update
+
+Dear PITC Support Team,
+
+Speed Monitor currently reports both monitored servers as responding.
+
+• Level-1: $levelText
+• SFTP: $sftpText
+
+This is a status update, not an outage complaint.
+
+Reported By: LESCO IT Directorate
+
+Regards,
+IT Directorate
+LESCO""".trimIndent()
+        }
     }
 
     private fun savePhone() {

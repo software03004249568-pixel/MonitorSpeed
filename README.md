@@ -7,8 +7,8 @@ Android Studio project (Kotlin, JDK 17, compileSdk 35, applicationId `com.lesco.
 - Manual Level-1 API and SFTP port checks.
 - Complaint email draft with a PIDC support-team complaint subject and generated status details.
 - Save a WhatsApp number locally; open WhatsApp with a prefilled complaint. The user reviews and presses Send.
-- Background service starts when the dashboard opens, checks Level-1 and SFTP every 15 seconds, and raises a sound/vibration notification when a server changes to down or recovers.
-- Stop Background Monitoring button stops the service.
+- Background service starts when the dashboard opens, checks Level-1 and SFTP every 15 seconds, and raises a sound/vibration notification both when a server goes DOWN and when it is RESTORED. Alerts are transition-based to avoid repeated alarms every check.
+- Server monitor buttons keep their normal/healthy color while starting or online; only an offline/error result makes that server button red. Stop Background Monitoring button stops the service.
 - GitHub Actions builds a debug APK on push to `main` or manual workflow dispatch.
 
 ## Important behavior/limitations
